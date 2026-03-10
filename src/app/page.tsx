@@ -1,7 +1,27 @@
+"use client";
 
-import { redirect } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUser } from "@/firebase";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
-  // Simple redirect to dashboard for this MVP version
-  redirect("/dashboard");
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading) {
+      if (user) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    }
+  }, [user, isUserLoading, router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 }

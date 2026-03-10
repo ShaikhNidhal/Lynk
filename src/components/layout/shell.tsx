@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -13,7 +12,8 @@ import {
   Menu, 
   X, 
   Plus,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar-mock";
 import { Button } from "@/components/ui/button";
@@ -22,16 +22,51 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { signOut } from "firebase/auth";
+import { doc } from "firebase/firestore";
 
 // Mock implementation of sidebar components since the provided sidebar.tsx is complex
 const SidebarMock = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(true);
+  const { user, isUserLoading } = useUser();
+  const { firestore } = useFirebase();
+  const router = useRouter();
+
+  // Fetch user profile from Firestore
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user?.uid]);
+  
+  const { data: profile } = useDoc(userProfileRef);
+
+  const handleLogout = async () => {
+    const { auth } = await import("@/firebase").then(m => m.initializeFirebase());
+    await signOut(auth);
+    router.push("/login");
+  };
+
+  if (isUserLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.push("/login");
+    return null;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className={cn(
@@ -61,18 +96,35 @@ const SidebarMock = ({ children }: { children: React.ReactNode }) => {
         </nav>
 
         <div className="p-4 border-t border-border mt-auto">
-          <div className={cn("flex items-center gap-3", !open && "justify-center")}>
-            <Avatar className="w-8 h-8">
-              <AvatarImage src="https://picsum.photos/seed/user/100/100" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
-            {open && (
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-medium truncate">John Doe</span>
-                <span className="text-xs text-muted-foreground truncate italic">Project Manager</span>
-              </div>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={cn("flex items-center gap-3 w-full hover:bg-secondary/50 p-2 rounded-lg transition-colors", !open && "justify-center")}>
+                <Avatar className="w-8 h-8 border">
+                  <AvatarImage src={`https://picsum.photos/seed/${user.uid}/100/100`} />
+                  <AvatarFallback>{profile?.firstName?.[0] || user.email?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+                {open && (
+                  <div className="flex flex-col overflow-hidden text-left">
+                    <span className="text-sm font-medium truncate">{profile?.firstName} {profile?.lastName}</span>
+                    <span className="text-[10px] text-muted-foreground truncate italic uppercase font-bold tracking-wider">{profile?.role || "Guest"}</span>
+                  </div>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="flex items-center gap-2">
+                  <Settings className="w-4 h-4" />
+                  Profile Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive flex items-center gap-2">
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
       <main className="flex-1 flex flex-col overflow-hidden">

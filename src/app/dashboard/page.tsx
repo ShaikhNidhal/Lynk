@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -9,8 +8,8 @@ import {
   Clock, 
   AlertCircle, 
   TrendingUp,
-  User,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import { 
   BarChart, 
@@ -25,6 +24,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useUser, useDoc, useFirebase, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 
 const workloadData = [
   { name: "Alice", tasks: 8, capacity: 10 },
@@ -35,12 +36,36 @@ const workloadData = [
 ];
 
 export default function DashboardPage() {
+  const { user } = useUser();
+  const { firestore } = useFirebase();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user?.uid]);
+
+  const { data: profile, isLoading } = useDoc(userProfileRef);
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, John!</h1>
-          <p className="text-muted-foreground mt-1">Here's what's happening across your projects today.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome back, {profile?.firstName || "User"}!
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Here&apos;s what&apos;s happening across your projects today.
+          </p>
         </div>
 
         {/* Stats Row */}
