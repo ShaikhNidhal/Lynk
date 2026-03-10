@@ -12,7 +12,7 @@ import {
   Share2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo } from "react";
+import { useState, useMemo, use } from "react";
 import { useUser, useFirebase, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, orderBy } from "firebase/firestore";
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
@@ -21,8 +21,8 @@ import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectMembersDialog } from "@/components/projects/project-members-dialog";
 
-export default function ProjectBoardPage({ params }: { params: { id: string } }) {
-  const { id: projectId } = params;
+export default function ProjectBoardPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: projectId } = use(params);
   const { user } = useUser();
   const { firestore } = useFirebase();
   const [selectedTask, setSelectedTask] = useState<any>(null);
