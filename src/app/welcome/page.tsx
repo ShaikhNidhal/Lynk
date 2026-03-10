@@ -18,7 +18,6 @@ import {
   Users, 
   ArrowRight,
   Zap,
-  LayoutDashboard,
   ShieldCheck
 } from "lucide-react";
 import Image from "next/image";
@@ -44,10 +43,10 @@ const splashScreens = [
   {
     title: "Seamless Collaboration",
     description: "Keep your team aligned with real-time comments, file sharing, and workload tracking.",
-    icon: <Users className="w-12 h-12 text-blue-500" />,
+    icon: <Users className="w-12 h-12 text-muted-foreground" />,
     image: "https://picsum.photos/seed/lynk3/800/600",
     imageHint: "team collaboration",
-    color: "bg-blue-50"
+    color: "bg-muted/30"
   }
 ];
 
