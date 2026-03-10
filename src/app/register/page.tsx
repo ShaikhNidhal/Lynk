@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFirebase } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ export default function RegisterPage() {
 
       toast({
         title: "Registration Successful",
-        description: `Welcome to SprintFlow, ${formData.firstName}!`,
+        description: `Welcome to Lynk, ${formData.firstName}!`,
       });
       
       router.push("/dashboard");
@@ -75,7 +75,7 @@ export default function RegisterPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
           <CardDescription>
-            Enter your details to get started with SprintFlow
+            Enter your details to get started with Lynk
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleRegister}>

@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 export const metadata: Metadata = {
-  title: 'SprintFlow | Professional Agile Management',
+  title: 'Lynk | Professional Agile Management',
   description: 'Manage projects, track time, and collaborate with AI-powered task breakdowns.',
 };
 

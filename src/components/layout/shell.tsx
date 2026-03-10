@@ -77,7 +77,7 @@ const SidebarMock = ({ children }: { children: React.ReactNode }) => {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-md">
               <FolderKanban className="w-5 h-5" />
             </div>
-            <span className="text-xl tracking-tight">SprintFlow</span>
+            <span className="text-xl tracking-tight">Lynk</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setOpen(!open)} className="hover:bg-primary/10 hover:text-primary">
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

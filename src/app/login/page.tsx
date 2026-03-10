@@ -47,7 +47,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
-            Enter your email to sign in to your account
+            Enter your email to sign in to your Lynk account
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
