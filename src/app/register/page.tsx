@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -45,6 +46,7 @@ export default function RegisterPage() {
         lastName: formData.lastName,
         email: formData.email,
         role: formData.role,
+        hasCompletedOnboarding: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
@@ -54,7 +56,8 @@ export default function RegisterPage() {
         description: `Welcome to Lynk, ${formData.firstName}!`,
       });
       
-      router.push("/dashboard");
+      // Redirect to welcome splash screens instead of dashboard
+      router.push("/welcome");
     } catch (error: any) {
       toast({
         title: "Registration Failed",
@@ -70,7 +73,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md glass-card">
         <CardHeader className="space-y-1 flex flex-col items-center">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white mb-4">
+          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white mb-4 shadow-lg shadow-primary/20">
             <FolderKanban className="w-6 h-6" />
           </div>
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
@@ -142,7 +145,7 @@ export default function RegisterPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Register
             </Button>

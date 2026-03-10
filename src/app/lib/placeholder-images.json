@@ -30,6 +30,24 @@
       "description": "Team Member Bob",
       "imageUrl": "https://picsum.photos/seed/bob/100/100",
       "imageHint": "portrait man"
+    },
+    {
+      "id": "welcome-1",
+      "description": "Lynk Welcome Workspace",
+      "imageUrl": "https://picsum.photos/seed/lynk1/800/600",
+      "imageHint": "project workspace"
+    },
+    {
+      "id": "welcome-2",
+      "description": "Lynk AI Assistant",
+      "imageUrl": "https://picsum.photos/seed/lynk2/800/600",
+      "imageHint": "ai productivity"
+    },
+    {
+      "id": "welcome-3",
+      "description": "Lynk Collaboration Team",
+      "imageUrl": "https://picsum.photos/seed/lynk3/800/600",
+      "imageHint": "team collaboration"
     }
   ]
 }
