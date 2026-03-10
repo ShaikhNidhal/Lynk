@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * SPRINTFLOW ACCESS CONTROL PHILOSOPHY
+     * 
+     * Core Philosophy:
+     * This ruleset implements a hybrid security model combining User Ownership, Global Role-Based 
+     * Access Control (RBAC), and Project-based Shared Access (Collaborators). 
+     * 
+     * Data Structure:
+     * - /users/{userId}: Global user profiles containing system-wide roles (Admin, Project Manager, etc.).
+     * - /projects/{projectId}: Collaborative containers using a 'members' map for authorization.
+     * - Nested Resources: Tasks, Comments, and Attachments denormalize the project 'members' map 
+     *   to ensure high-performance authorization without recursive database lookups.
+     * 
+     * Key Security Decisions:
+     * - Authorization Independence: Every collaborative document contains a 'members' map. Rules 
+     *   check this map directly (resource.data.members) to determine access, avoiding costly get() calls.
+     * - Structural Segregation: User-private data (like notifications) is strictly nested under 
+     *   the user's path, while shared work occurs in the top-level projects tree.
+     * - RBAC: Global 'Admin' roles are granted broad overrides for user management and auditing.
+     * 
+     * Denormalization for Authorization:
+     * To maintain performance and security at scale, the 'members' map from a Project is copied 
+     * to all its child tasks, comments, and attachments. This allows the security rules to 
+     * verify access locally on the document being requested.
+     */
+
+    // --- Helper Functions ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // Retrieves the global user profile to check system roles
+    function getGlobalRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasGlobalRole(role) {
+      return isSignedIn() && getGlobalRole() == role;
+    }
+
+    // Checks if the user is present in the document's denormalized members map
+    function isProjectMember(data) {
+      return isSignedIn() && request.auth.uid in data.members;
+    }
+
+    // Validates that the data matches the path for relational integrity
+    function matchesPath(field, pathId) {
+      return field == pathId;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the UserProfile entity. Users can manage their own profiles; Admins have full control.
+     * @path /users/{userId}
+     * @allow (get) Signed-in user requesting their own profile or an Admin.
+     * @deny (list) Any non-Admin attempting to list all users.
+     * @principle Validates identity and enforces global RBAC roles.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId) || hasGlobalRole('Admin');
+      allow list: if hasGlobalRole('Admin');
+      allow create: if isOwner(userId) && matchesPath(request.resource.data.id, userId);
+      allow update: if (isOwner(userId) || hasGlobalRole('Admin')) && resource != null;
+      allow delete: if hasGlobalRole('Admin') && resource != null;
+
+      /**
+       * @description Private user notifications. Access is strictly restricted to the recipient.
+       * @path /users/{userId}/notifications/{notificationId}
+       * @allow (list) The user whose ID matches the path.
+       * @deny (get) User 'B' trying to read User 'A's notifications.
+       * @principle Enforces strict path-based ownership for private data.
+       */
+      match /notifications/{notificationId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Collaborative projects. Access is determined by the 'members' map within the document.
+     * @path /projects/{projectId}
+     * @allow (list) User whose UID is a key in the document's 'members' map.
+     * @deny (create) User attempting to create a project where they aren't the owner in the members map.
+     * @principle Shared Access (Closed Collaborators) using denormalized membership maps.
+     */
+    match /projects/{projectId} {
+      allow get, list: if isProjectMember(resource.data);
+      allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] != null;
+      allow update: if isProjectMember(resource.data) && resource != null;
+      allow delete: if (resource.data.members[request.auth.uid] == 'owner' || hasGlobalRole('Admin')) && resource != null;
+
+      /**
+       * @description Tasks within a project. Inherits access logic via denormalized members map.
+       * @path /projects/{projectId}/tasks/{taskId}
+       * @allow (get) A member of the parent project (verified via task.members).
+       * @deny (update) Attempting to change the project assignment (projectId field).
+       * @principle Relational integrity and authorization independence.
+       */
+      match /tasks/{taskId} {
+        allow get, list: if isProjectMember(resource.data);
+        allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.projectId, projectId);
+        allow update: if isProjectMember(resource.data) && matchesPath(request.resource.data.projectId, resource.data.projectId) && resource != null;
+        allow delete: if isProjectMember(resource.data) && resource != null;
+
+        /**
+         * @description Subtasks of a task. Uses denormalized project members map for validation.
+         * @path /projects/{projectId}/tasks/{taskId}/subtasks/{subtaskId}
+         */
+        match /subtasks/{subtaskId} {
+          allow get, list: if isProjectMember(resource.data);
+          allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.taskId, taskId);
+          allow update: if isProjectMember(resource.data) && matchesPath(request.resource.data.taskId, resource.data.taskId) && resource != null;
+          allow delete: if isProjectMember(resource.data) && resource != null;
+        }
+
+        /**
+         * @description Comments on tasks. Restricted to project members.
+         * @path /projects/{projectId}/tasks/{taskId}/comments/{commentId}
+         */
+        match /comments/{commentId} {
+          allow get, list: if isProjectMember(resource.data);
+          allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.authorId, request.auth.uid);
+          allow update: if isProjectMember(resource.data) && matchesPath(resource.data.authorId, request.auth.uid) && resource != null;
+          allow delete: if (isProjectMember(resource.data) && matchesPath(resource.data.authorId, request.auth.uid)) || hasGlobalRole('Admin');
+        }
+
+        /**
+         * @description File attachments for tasks. Restricted to project members.
+         * @path /projects/{projectId}/tasks/{taskId}/attachments/{attachmentId}
+         */
+        match /attachments/{attachmentId} {
+          allow get, list: if isProjectMember(resource.data);
+          allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.uploaderId, request.auth.uid);
+          allow update: if isProjectMember(resource.data) && matchesPath(resource.data.uploaderId, request.auth.uid) && resource != null;
+          allow delete: if (isProjectMember(resource.data) && matchesPath(resource.data.uploaderId, request.auth.uid)) || hasGlobalRole('Admin');
+        }
+
+        /**
+         * @description Time tracking entries. Users can log time; project members can view.
+         * @path /projects/{projectId}/tasks/{taskId}/timeEntries/{timeEntryId}
+         */
+        match /timeEntries/{timeEntryId} {
+          allow get, list: if isProjectMember(resource.data);
+          allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.userId, request.auth.uid);
+          allow update: if isProjectMember(resource.data) && matchesPath(resource.data.userId, request.auth.uid) && resource != null;
+          allow delete: if (isProjectMember(resource.data) && matchesPath(resource.data.userId, request.auth.uid)) || hasGlobalRole('Admin');
+        }
+      }
+    }
+  }
+}
