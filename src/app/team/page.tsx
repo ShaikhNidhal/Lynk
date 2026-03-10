@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Shield, UserPlus, Loader2 } from "lucide-react";
+import { Search, Mail, Shield, Loader2 } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 
 export default function TeamPage() {
   const { user } = useUser();
@@ -41,10 +42,7 @@ export default function TeamPage() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Team Directory</h1>
             <p className="text-muted-foreground mt-1">View and manage your organization's members.</p>
           </div>
-          <Button className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Invite Member
-          </Button>
+          <InviteMemberDialog />
         </div>
 
         <div className="relative max-w-md">
