@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -16,12 +15,13 @@ import {
   Clock, 
   Calendar, 
   User, 
-  CheckCircle2, 
   Plus, 
   Trash2, 
   Loader2,
   ListTodo,
-  Check
+  MessageSquare,
+  Paperclip,
+  Info
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
@@ -31,7 +31,10 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AIBreakdownButton } from "@/components/tasks/ai-breakdown-button";
+import { TaskComments } from "@/components/tasks/task-comments";
+import { TaskAttachments } from "@/components/tasks/task-attachments";
 import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TaskDetailSheetProps {
   isOpen: boolean;
@@ -105,124 +108,165 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-        <SheetHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Badge variant={task.priority === "High" || task.priority === "Critical" ? "destructive" : "default"}>
-              {task.priority}
-            </Badge>
-            <div className="flex gap-2">
-              <SelectStatus currentStatus={task.status} onStatusChange={handleUpdateStatus} />
-            </div>
-          </div>
-          <SheetTitle className="text-2xl font-bold">{task.title}</SheetTitle>
-          <SheetDescription className="text-sm leading-relaxed">
-            {task.description || "No description provided."}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="py-8 space-y-8">
-          {/* Task Metadata */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Calendar className="w-3 h-3" /> Due Date
-              </span>
-              <p className="text-sm font-medium">
-                {task.dueDate ? format(new Date(task.dueDate), "PPP") : "No due date"}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <User className="w-3 h-3" /> Assignee
-              </span>
-              <p className="text-sm font-medium">
-                Unassigned
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Subtasks Section */}
-          <div className="space-y-4">
+      <SheetContent className="sm:max-w-[600px] p-0 flex flex-col">
+        <div className="p-6 pb-0">
+          <SheetHeader className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm tracking-tight flex items-center gap-2">
-                <ListTodo className="w-4 h-4 text-primary" />
-                Subtasks
-                {subtasks && subtasks.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {subtasks.filter(s => s.status === "done").length}/{subtasks.length}
-                  </Badge>
-                )}
-              </h3>
-              <AIBreakdownButton 
-                taskDescription={task.title + ": " + task.description} 
-                onSubtasksGenerated={(titles) => titles.forEach(t => handleAddSubtask(t))} 
-              />
+              <Badge variant={task.priority === "High" || task.priority === "Critical" ? "destructive" : "default"} className="uppercase text-[10px] font-bold">
+                {task.priority}
+              </Badge>
+              <div className="flex gap-2">
+                <SelectStatus currentStatus={task.status} onStatusChange={handleUpdateStatus} />
+              </div>
             </div>
-
-            <div className="space-y-2">
-              {isSubtasksLoading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/30" />
-                </div>
-              ) : subtasks && subtasks.length > 0 ? (
-                subtasks.map((sub) => (
-                  <div key={sub.id} className="flex items-center justify-between group p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Checkbox 
-                        checked={sub.status === "done"} 
-                        onCheckedChange={() => handleToggleSubtask(sub)}
-                      />
-                      <span className={`text-sm ${sub.status === "done" ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                        {sub.title}
-                      </span>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDeleteSubtask(sub.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground italic text-center py-4 border-2 border-dashed rounded-lg">
-                  No subtasks added yet. Use AI Breakdown or add manually.
-                </p>
-              )}
-
-              {isAddingSubtask ? (
-                <div className="flex gap-2 pt-2">
-                  <Input 
-                    placeholder="New subtask..." 
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(newSubtaskTitle)}
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={() => handleAddSubtask(newSubtaskTitle)}>Add</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)}>Cancel</Button>
-                </div>
-              ) : (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full justify-start gap-2 text-primary hover:bg-primary/5"
-                  onClick={() => setIsAddingSubtask(true)}
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Subtask
-                </Button>
-              )}
-            </div>
-          </div>
+            <SheetTitle className="text-2xl font-bold leading-tight">{task.title}</SheetTitle>
+          </SheetHeader>
         </div>
 
-        <SheetFooter className="absolute bottom-0 left-0 right-0 p-6 bg-background border-t">
+        <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0 mt-6">
+          <div className="px-6">
+            <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
+              <TabsTrigger value="details" className="gap-2">
+                <Info className="w-3.5 h-3.5" /> Details
+              </TabsTrigger>
+              <TabsTrigger value="comments" className="gap-2">
+                <MessageSquare className="w-3.5 h-3.5" /> Comments
+              </TabsTrigger>
+              <TabsTrigger value="attachments" className="gap-2">
+                <Paperclip className="w-3.5 h-3.5" /> Files
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <Separator className="my-4" />
+
+          <div className="flex-1 overflow-y-auto px-6 pb-24">
+            <TabsContent value="details" className="mt-0 space-y-8">
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description</h4>
+                <p className="text-sm leading-relaxed text-foreground">
+                  {task.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 text-primary" /> Due Date
+                  </span>
+                  <p className="text-sm font-medium">
+                    {task.dueDate ? format(new Date(task.dueDate), "PPP") : "No due date"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <User className="w-3 h-3 text-primary" /> Created By
+                  </span>
+                  <p className="text-sm font-medium">
+                    User {task.ownerId?.slice(0, 4)}...
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm tracking-tight flex items-center gap-2">
+                    <ListTodo className="w-4 h-4 text-primary" />
+                    Checklist & Subtasks
+                    {subtasks && subtasks.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 rounded-sm text-[10px]">
+                        {subtasks.filter(s => s.status === "done").length}/{subtasks.length}
+                      </Badge>
+                    )}
+                  </h3>
+                  <AIBreakdownButton 
+                    taskDescription={task.title + ": " + task.description} 
+                    onSubtasksGenerated={(titles) => titles.forEach(t => handleAddSubtask(t))} 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  {isSubtasksLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/30" />
+                    </div>
+                  ) : subtasks && subtasks.length > 0 ? (
+                    subtasks.map((sub) => (
+                      <div key={sub.id} className="flex items-center justify-between group p-2 rounded-md hover:bg-secondary/30 transition-colors border border-transparent hover:border-border">
+                        <div className="flex items-center gap-3">
+                          <Checkbox 
+                            checked={sub.status === "done"} 
+                            onCheckedChange={() => handleToggleSubtask(sub)}
+                          />
+                          <span className={`text-sm ${sub.status === "done" ? 'line-through text-muted-foreground font-normal' : 'text-foreground font-medium'}`}>
+                            {sub.title}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteSubtask(sub.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 border-2 border-dashed rounded-lg bg-secondary/10">
+                      <ListTodo className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground italic">No subtasks yet.</p>
+                    </div>
+                  )}
+
+                  {isAddingSubtask ? (
+                    <div className="flex gap-2 pt-2 animate-in fade-in slide-in-from-top-1">
+                      <Input 
+                        placeholder="What needs to be done?" 
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(newSubtaskTitle)}
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={() => handleAddSubtask(newSubtaskTitle)}>Add</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full justify-start gap-2 text-primary hover:bg-primary/5 border border-dashed hover:border-solid transition-all mt-2"
+                      onClick={() => setIsAddingSubtask(true)}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add item to checklist
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="comments" className="mt-0">
+              <TaskComments 
+                projectId={projectId} 
+                taskId={task.id} 
+                projectMembers={projectMembers} 
+              />
+            </TabsContent>
+
+            <TabsContent value="attachments" className="mt-0">
+              <TaskAttachments 
+                projectId={projectId} 
+                taskId={task.id} 
+                projectMembers={projectMembers} 
+              />
+            </TabsContent>
+          </div>
+        </Tabs>
+
+        <SheetFooter className="absolute bottom-0 left-0 right-0 p-6 bg-background border-t z-10">
           <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
             Close Task View
           </Button>
@@ -246,7 +290,7 @@ function SelectStatus({ currentStatus, onStatusChange }: { currentStatus: string
           key={s.id} 
           variant={currentStatus?.toLowerCase() === s.id ? "default" : "ghost"} 
           size="sm" 
-          className="h-7 text-[10px] uppercase font-bold"
+          className="h-7 text-[10px] uppercase font-bold px-3"
           onClick={() => onStatusChange(s.id)}
         >
           {s.label}
