@@ -1,0 +1,35 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "project-1",
+      "description": "Software Development Dashboard",
+      "imageUrl": "https://picsum.photos/seed/sprint1/600/400",
+      "imageHint": "software dashboard"
+    },
+    {
+      "id": "project-2",
+      "description": "Mobile App UI Design",
+      "imageUrl": "https://picsum.photos/seed/sprint2/600/400",
+      "imageHint": "mobile design"
+    },
+    {
+      "id": "project-3",
+      "description": "Marketing Campaign Strategy",
+      "imageUrl": "https://picsum.photos/seed/sprint3/600/400",
+      "imageHint": "marketing strategy"
+    },
+    {
+      "id": "user-1",
+      "description": "Team Member Alice",
+      "imageUrl": "https://picsum.photos/seed/alice/100/100",
+      "imageHint": "portrait woman"
+    },
+    {
+      "id": "user-2",
+      "description": "Team Member Bob",
+      "imageUrl": "https://picsum.photos/seed/bob/100/100",
+      "imageHint": "portrait man"
+    }
+  ]
+}
