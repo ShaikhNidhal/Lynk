@@ -81,25 +81,25 @@ export default function DashboardPage() {
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               Welcome back, {profile?.firstName || "User"}!
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Here's the current state of your resources and projects.
+            <p className="text-sm text-muted-foreground mt-1">
+              Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Overview of your resources.
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/time">View Timesheets</Link>
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none" asChild>
+              <Link href="/time">Timesheets</Link>
             </Button>
-            <Button size="sm" asChild>
+            <Button size="sm" className="flex-1 sm:flex-none" asChild>
               <Link href="/projects">Manage Boards</Link>
             </Button>
           </div>
         </div>
 
         {/* Stats Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard 
             title="Assigned Projects" 
             value={activeProjectsCount.toString()} 
@@ -126,39 +126,39 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-7">
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-7">
           {/* Workload Visualization */}
           <Card className="md:col-span-4 glass-card border-primary/10">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Resource Workload Analysis</CardTitle>
-                  <CardDescription>Task allocation vs. weekly capacity (Threshold: 10)</CardDescription>
+                  <CardTitle className="text-lg">Resource Workload Analysis</CardTitle>
+                  <CardDescription className="text-xs">Task allocation vs. capacity (Threshold: 10)</CardDescription>
                 </div>
-                <Zap className="w-5 h-5 text-accent animate-pulse" />
+                <Zap className="w-5 h-5 text-accent animate-pulse hidden sm:block" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px] w-full mt-4">
+              <div className="h-[250px] sm:h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={workloadData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <BarChart data={workloadData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="name" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{fill: '#6b7280', fontSize: 12}} 
+                      tick={{fill: '#6b7280', fontSize: 10}} 
                     />
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{fill: '#6b7280', fontSize: 12}} 
+                      tick={{fill: '#6b7280', fontSize: 10}} 
                     />
                     <Tooltip 
                       cursor={{fill: 'hsl(var(--secondary)/0.5)'}}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px' }}
                     />
-                    <Legend verticalAlign="top" height={36}/>
+                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{fontSize: '12px'}}/>
                     <Bar name="Current Tasks" dataKey="tasks" radius={[4, 4, 0, 0]}>
                       {workloadData.map((entry, index) => (
                         <Cell 
@@ -176,37 +176,37 @@ export default function DashboardPage() {
           {/* Team Availability Status */}
           <Card className="md:col-span-3 glass-card">
             <CardHeader>
-              <CardTitle>Team Status & Availability</CardTitle>
-              <CardDescription>Real-time availability monitoring</CardDescription>
+              <CardTitle className="text-lg">Team Status</CardTitle>
+              <CardDescription className="text-xs">Real-time monitoring</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {workloadData.map((member) => (
                   <div key={member.name} className="flex items-center justify-between group">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center font-bold text-primary border border-primary/10">
+                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center font-bold text-primary border border-primary/10 text-xs">
                         {member.name[0]}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold">{member.name}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
-                          {member.tasks} active tasks
+                        <p className="text-xs font-semibold">{member.name}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">
+                          {member.tasks} tasks
                         </p>
                       </div>
                     </div>
                     <Badge 
                       variant={member.availability === "Critical" || member.availability === "Overloaded" ? "destructive" : "secondary"}
-                      className="px-2 py-0.5 text-[10px]"
+                      className="px-1.5 py-0 text-[9px]"
                     >
                       {member.availability}
                     </Badge>
                   </div>
                 ))}
               </div>
-              <div className="mt-8 pt-6 border-t border-border">
-                <Button variant="outline" className="w-full gap-2 text-xs font-bold uppercase tracking-widest" asChild>
+              <div className="mt-6 pt-4 border-t border-border">
+                <Button variant="outline" className="w-full gap-2 text-[10px] h-8 font-bold uppercase tracking-widest" asChild>
                   <Link href="/team">
-                    Full Resource Planner <ArrowRight className="w-3 h-3" />
+                    Full Planner <ArrowRight className="w-3 h-3" />
                   </Link>
                 </Button>
               </div>
@@ -217,34 +217,34 @@ export default function DashboardPage() {
           <Card className="md:col-span-7 glass-card border-accent/10">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>My Active Projects</CardTitle>
-                <CardDescription>Direct access to your assigned boards</CardDescription>
+                <CardTitle className="text-lg">Active Projects</CardTitle>
+                <CardDescription className="text-xs">Quick access to assigned boards</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/projects" className="text-primary hover:underline flex items-center gap-1 font-bold text-xs uppercase tracking-wider">
-                  View All Boards <ArrowRight className="w-3 h-3" />
+              <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
+                <Link href="/projects" className="text-primary hover:underline flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider">
+                  View All <ArrowRight className="w-3 h-3" />
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
               {recentProjects.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                   {recentProjects.map((project) => (
                     <Link key={project.id} href={`/projects/${project.id}`}>
                       <div className="p-4 rounded-xl border border-border bg-white hover:border-primary/40 hover:shadow-md transition-all group">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                            <Zap className="w-4 h-4" />
+                          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <Zap className="w-3.5 h-3.5" />
                           </div>
-                          <Badge variant="outline" className="text-[10px]">{project.type}</Badge>
+                          <Badge variant="outline" className="text-[9px] px-1">{project.type}</Badge>
                         </div>
-                        <h4 className="font-bold text-sm truncate group-hover:text-primary transition-colors">{project.name}</h4>
+                        <h4 className="font-bold text-xs truncate group-hover:text-primary transition-colors">{project.name}</h4>
                         <div className="mt-4 space-y-2">
-                           <div className="flex justify-between text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">
+                           <div className="flex justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">
                              <span>Health</span>
                              <span className="text-green-600">{project.status}</span>
                            </div>
-                           <Progress value={65} className="h-1.5" />
+                           <Progress value={65} className="h-1" />
                         </div>
                       </div>
                     </Link>
@@ -252,9 +252,9 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="py-12 text-center bg-secondary/20 rounded-xl border-2 border-dashed">
-                  <Briefcase className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-medium">No projects assigned yet.</p>
-                  <Button variant="link" asChild className="mt-2">
+                  <Briefcase className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground font-medium">No projects assigned yet.</p>
+                  <Button variant="link" asChild className="mt-2 text-xs">
                     <Link href="/projects">Create your first project</Link>
                   </Button>
                 </div>
@@ -270,16 +270,16 @@ export default function DashboardPage() {
 function StatCard({ title, value, description, icon }: { title: string, value: string, description: string, icon: React.ReactNode }) {
   return (
     <Card className="glass-card overflow-hidden border-primary/5">
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-center justify-between space-y-0 pb-2">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
-          <div className="h-4 w-4 text-muted-foreground">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
+          <div className="h-4 w-4 text-muted-foreground opacity-70">
             {icon}
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
-          <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium italic">
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="text-[9px] text-muted-foreground flex items-center gap-1 font-medium italic">
             {description}
           </p>
         </div>
