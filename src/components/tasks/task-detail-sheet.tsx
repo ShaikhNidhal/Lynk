@@ -35,6 +35,7 @@ import { TaskComments } from "@/components/tasks/task-comments";
 import { TaskAttachments } from "@/components/tasks/task-attachments";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createNotification } from "@/lib/notifications";
 
 interface TaskDetailSheetProps {
   isOpen: boolean;
@@ -101,6 +102,17 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
       status: newStatus,
       updatedAt: serverTimestamp(),
     });
+
+    // Notify project members (simulated for project owner in this example)
+    if (task.ownerId && task.ownerId !== user?.uid) {
+      createNotification(
+        firestore, 
+        task.ownerId, 
+        'status_change', 
+        `Task "${task.title}" was updated to ${newStatus}`
+      );
+    }
+
     toast({ title: "Status Updated", description: `Task is now ${newStatus}` });
   };
 
