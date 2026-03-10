@@ -14,18 +14,6 @@ service cloud.firestore {
      * - /projects/{projectId}: Collaborative containers using a 'members' map for authorization.
      * - Nested Resources: Tasks, Comments, and Attachments denormalize the project 'members' map 
      *   to ensure high-performance authorization without recursive database lookups.
-     * 
-     * Key Security Decisions:
-     * - Authorization Independence: Every collaborative document contains a 'members' map. Rules 
-     *   check this map directly (resource.data.members) to determine access, avoiding costly get() calls.
-     * - Structural Segregation: User-private data (like notifications) is strictly nested under 
-     *   the user's path, while shared work occurs in the top-level projects tree.
-     * - RBAC: Global 'Admin' roles are granted broad overrides for user management and auditing.
-     * 
-     * Denormalization for Authorization:
-     * To maintain performance and security at scale, the 'members' map from a Project is copied 
-     * to all its child tasks, comments, and attachments. This allows the security rules to 
-     * verify access locally on the document being requested.
      */
 
     // --- Helper Functions ---
@@ -52,7 +40,6 @@ service cloud.firestore {
     }
 
     // Checks if the user is present in the document's denormalized members map
-    // Using bracket notation for better compatibility with Query as a Policy (QAP) filters
     function isProjectMember(data) {
       return isSignedIn() && data.members != null && data.members[request.auth.uid] != null;
     }
@@ -65,25 +52,18 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     /**
-     * @description Rules for the UserProfile entity. Users can manage their own profiles; Admins have full control.
-     * @path /users/{userId}
-     * @allow (get) Signed-in user requesting their own profile or an Admin.
-     * @deny (list) Any non-Admin attempting to list all users.
-     * @principle Validates identity and enforces global RBAC roles.
+     * @description Rules for the UserProfile entity. 
+     * Any signed-in user can view other profiles for the Team Directory.
+     * Only Admins or the owner can update.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || hasGlobalRole('Admin');
-      allow list: if hasGlobalRole('Admin');
+      allow get, list: if isSignedIn();
       allow create: if isOwner(userId) && matchesPath(request.resource.data.id, userId);
       allow update: if (isOwner(userId) || hasGlobalRole('Admin')) && resource != null;
       allow delete: if hasGlobalRole('Admin') && resource != null;
 
       /**
-       * @description Private user notifications. Access is strictly restricted to the recipient.
-       * @path /users/{userId}/notifications/{notificationId}
-       * @allow (list) The user whose ID matches the path.
-       * @deny (get) User 'B' trying to read User 'A's notifications.
-       * @principle Enforces strict path-based ownership for private data.
+       * @description Private user notifications.
        */
       match /notifications/{notificationId} {
         allow get, list: if isOwner(userId);
@@ -93,11 +73,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Collaborative projects. Access is determined by the 'members' map within the document.
-     * @path /projects/{projectId}
-     * @allow (list) User whose UID is a key in the document's 'members' map.
-     * @deny (create) User attempting to create a project where they aren't the owner in the members map.
-     * @principle Shared Access (Closed Collaborators) using denormalized membership maps.
+     * @description Collaborative projects.
      */
     match /projects/{projectId} {
       allow get, list: if isProjectMember(resource.data);
@@ -106,11 +82,7 @@ service cloud.firestore {
       allow delete: if (resource.data.members[request.auth.uid] == 'owner' || hasGlobalRole('Admin')) && resource != null;
 
       /**
-       * @description Tasks within a project. Inherits access logic via denormalized members map.
-       * @path /projects/{projectId}/tasks/{taskId}
-       * @allow (get) A member of the parent project (verified via task.members).
-       * @deny (update) Attempting to change the project assignment (projectId field).
-       * @principle Relational integrity and authorization independence.
+       * @description Tasks within a project.
        */
       match /tasks/{taskId} {
         allow get, list: if isProjectMember(resource.data);
@@ -119,8 +91,7 @@ service cloud.firestore {
         allow delete: if isProjectMember(resource.data) && resource != null;
 
         /**
-         * @description Subtasks of a task. Uses denormalized project members map for validation.
-         * @path /projects/{projectId}/tasks/{taskId}/subtasks/{subtaskId}
+         * @description Subtasks of a task.
          */
         match /subtasks/{subtaskId} {
           allow get, list: if isProjectMember(resource.data);
@@ -130,8 +101,7 @@ service cloud.firestore {
         }
 
         /**
-         * @description Comments on tasks. Restricted to project members.
-         * @path /projects/{projectId}/tasks/{taskId}/comments/{commentId}
+         * @description Comments on tasks.
          */
         match /comments/{commentId} {
           allow get, list: if isProjectMember(resource.data);
@@ -141,8 +111,7 @@ service cloud.firestore {
         }
 
         /**
-         * @description File attachments for tasks. Restricted to project members.
-         * @path /projects/{projectId}/tasks/{taskId}/attachments/{attachmentId}
+         * @description File attachments for tasks.
          */
         match /attachments/{attachmentId} {
           allow get, list: if isProjectMember(resource.data);
@@ -152,8 +121,7 @@ service cloud.firestore {
         }
 
         /**
-         * @description Time tracking entries. Users can log time; project members can view.
-         * @path /projects/{projectId}/tasks/{taskId}/timeEntries/{timeEntryId}
+         * @description Time tracking entries.
          */
         match /timeEntries/{timeEntryId} {
           allow get, list: if isProjectMember(resource.data);
