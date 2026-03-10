@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -15,7 +16,6 @@ import {
   Clock,
   Loader2
 } from "lucide-react";
-import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar-mock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -33,14 +33,12 @@ import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { doc } from "firebase/firestore";
 
-// Mock implementation of sidebar components since the provided sidebar.tsx is complex
 const SidebarMock = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(true);
   const { user, isUserLoading } = useUser();
   const { firestore } = useFirebase();
   const router = useRouter();
 
-  // Fetch user profile from Firestore
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
@@ -70,17 +68,17 @@ const SidebarMock = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className={cn(
-        "bg-white border-r transition-all duration-300 flex flex-col",
+        "bg-card border-r transition-all duration-300 flex flex-col z-20 shadow-sm",
         open ? "w-64" : "w-20"
       )}>
         <div className="p-4 flex items-center justify-between">
           <Link href="/dashboard" className={cn("flex items-center gap-2 font-bold text-primary transition-all", !open && "opacity-0 invisible w-0")}>
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-md">
               <FolderKanban className="w-5 h-5" />
             </div>
             <span className="text-xl tracking-tight">SprintFlow</span>
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)} className="hover:bg-primary/10 hover:text-primary">
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
         </div>
@@ -98,20 +96,20 @@ const SidebarMock = ({ children }: { children: React.ReactNode }) => {
         <div className="p-4 border-t border-border mt-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className={cn("flex items-center gap-3 w-full hover:bg-secondary/50 p-2 rounded-lg transition-colors", !open && "justify-center")}>
-                <Avatar className="w-8 h-8 border">
+              <button className={cn("flex items-center gap-3 w-full hover:bg-secondary/50 p-2 rounded-lg transition-colors group", !open && "justify-center")}>
+                <Avatar className="w-8 h-8 border shadow-sm group-hover:border-primary/50 transition-colors">
                   <AvatarImage src={`https://picsum.photos/seed/${user.uid}/100/100`} />
                   <AvatarFallback>{profile?.firstName?.[0] || user.email?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
                 {open && (
                   <div className="flex flex-col overflow-hidden text-left">
-                    <span className="text-sm font-medium truncate">{profile?.firstName} {profile?.lastName}</span>
-                    <span className="text-[10px] text-muted-foreground truncate italic uppercase font-bold tracking-wider">{profile?.role || "Guest"}</span>
+                    <span className="text-sm font-semibold truncate text-foreground">{profile?.firstName} {profile?.lastName}</span>
+                    <span className="text-[10px] text-primary/80 truncate italic uppercase font-bold tracking-wider">{profile?.role || "Guest"}</span>
                   </div>
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 glass-card">
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="flex items-center gap-2">
                   <Settings className="w-4 h-4" />
@@ -142,33 +140,39 @@ const NavItem = ({ icon, label, href, open }: { icon: React.ReactNode, label: st
     <Link 
       href={href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
-        active ? "bg-primary text-white" : "text-muted-foreground hover:bg-secondary hover:text-primary"
+        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
+        active 
+          ? "bg-primary text-white shadow-md shadow-primary/20" 
+          : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
       )}
     >
       <div className={cn("shrink-0 transition-all", active ? "text-white" : "text-muted-foreground group-hover:text-primary")}>
         {React.cloneElement(icon as React.ReactElement, { className: "w-5 h-5" })}
       </div>
-      {open && <span className="font-medium whitespace-nowrap">{label}</span>}
+      {open && <span className="font-semibold whitespace-nowrap">{label}</span>}
+      {active && open && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
     </Link>
   );
 };
 
 const TopNav = () => {
   return (
-    <header className="h-16 border-b bg-white/50 backdrop-blur-sm px-6 flex items-center justify-between sticky top-0 z-10">
+    <header className="h-16 border-b bg-card/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
       <div className="flex items-center flex-1 max-w-md gap-4">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search tasks, projects..." className="pl-9 bg-secondary/50 border-none focus-visible:ring-primary" />
+          <Input 
+            placeholder="Search tasks, projects..." 
+            className="pl-9 bg-background border-none focus-visible:ring-primary shadow-inner" 
+          />
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative hover:bg-primary/10">
           <Bell className="w-5 h-5 text-muted-foreground" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-white"></span>
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-card"></span>
         </Button>
-        <Button className="hidden sm:flex gap-2">
+        <Button className="hidden sm:flex gap-2 shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4" />
           New Project
         </Button>
@@ -181,7 +185,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <SidebarMock>
       <TopNav />
-      <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+      <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-background">
         {children}
       </div>
     </SidebarMock>

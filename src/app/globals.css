@@ -5,26 +5,38 @@
 
 @layer base {
   :root {
-    --background: 214 15% 95%; /* #F0F2F5 */
+    /* Primary Color: Professional and calm blue (#2E73B8) */
+    --primary: 210 60% 45%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Background Color: Subtle, very light blue-grey (#F0F2F5) */
+    --background: 216 15% 95%;
     --foreground: 222 47% 11%;
+
+    /* Accent Color: Vibrant cyan (#52E0E0) */
+    --accent: 180 70% 60%;
+    --accent-foreground: 180 40% 10%;
+
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 210 60% 45%; /* #2E73B8 Professional Blue */
-    --primary-foreground: 210 40% 98%;
+    
     --secondary: 210 20% 90%;
     --secondary-foreground: 210 60% 45%;
+    
     --muted: 210 20% 90%;
     --muted-foreground: 215 16% 47%;
-    --accent: 180 70% 60%; /* #52E0E0 Vibrant Cyan */
-    --accent-foreground: 180 40% 10%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 210 60% 45%;
+    
     --radius: 0.75rem;
+    
     --chart-1: 210 60% 45%;
     --chart-2: 180 70% 60%;
     --chart-3: 197 37% 24%;
@@ -66,4 +78,8 @@
 
 .glass-card {
   @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+}
+
+.cyan-accent {
+  @apply bg-accent text-accent-foreground hover:bg-accent/90;
 }
