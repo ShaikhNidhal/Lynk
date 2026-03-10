@@ -52,8 +52,9 @@ service cloud.firestore {
     }
 
     // Checks if the user is present in the document's denormalized members map
+    // Using bracket notation for better compatibility with Query as a Policy (QAP) filters
     function isProjectMember(data) {
-      return isSignedIn() && request.auth.uid in data.members;
+      return isSignedIn() && data.members != null && data.members[request.auth.uid] != null;
     }
 
     // Validates that the data matches the path for relational integrity
@@ -146,8 +147,8 @@ service cloud.firestore {
         match /attachments/{attachmentId} {
           allow get, list: if isProjectMember(resource.data);
           allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.uploaderId, request.auth.uid);
-          allow update: if isProjectMember(resource.data) && matchesPath(resource.data.uploaderId, request.auth.uid) && resource != null;
-          allow delete: if (isProjectMember(resource.data) && matchesPath(resource.data.uploaderId, request.auth.uid)) || hasGlobalRole('Admin');
+          allow update: if isProjectMember(resource.data) && matchesPath(request.resource.data.uploaderId, request.auth.uid) && resource != null;
+          allow delete: if (isProjectMember(resource.data) && matchesPath(request.resource.data.uploaderId, request.auth.uid)) || hasGlobalRole('Admin');
         }
 
         /**
@@ -157,8 +158,8 @@ service cloud.firestore {
         match /timeEntries/{timeEntryId} {
           allow get, list: if isProjectMember(resource.data);
           allow create: if isProjectMember(request.resource.data) && matchesPath(request.resource.data.userId, request.auth.uid);
-          allow update: if isProjectMember(resource.data) && matchesPath(resource.data.userId, request.auth.uid) && resource != null;
-          allow delete: if (isProjectMember(resource.data) && matchesPath(resource.data.userId, request.auth.uid)) || hasGlobalRole('Admin');
+          allow update: if isProjectMember(resource.data) && matchesPath(request.resource.data.userId, request.auth.uid) && resource != null;
+          allow delete: if (isProjectMember(resource.data) && matchesPath(request.resource.data.userId, request.auth.uid)) || hasGlobalRole('Admin');
         }
       }
     }

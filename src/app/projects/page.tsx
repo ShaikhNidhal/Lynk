@@ -13,7 +13,7 @@ import { useUser, useFirebase, useCollection, useMemoFirebase } from "@/firebase
 import { collection, query, where, orderBy } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export default function ProjectsPage() {
   const { user } = useUser();
@@ -23,21 +23,34 @@ export default function ProjectsPage() {
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     // Query projects where the user is a member (the members map contains their UID)
-    // Note: We're using a structured query that matches our security rules philosophy
+    // We only use the existence check filter to satisfy security rules (QAP).
+    // Note: We avoid compound orderBy with dynamic keys as it's impossible to index at scale.
+    // Sorting will be handled on the client side.
     return query(
       collection(firestore, "projects"),
-      where(`members.${user.uid}`, "!=", null),
-      orderBy(`members.${user.uid}`), // Dummy sort to satisfy compound query requirements if needed
-      orderBy("createdAt", "desc")
+      where(`members.${user.uid}`, "!=", null)
     );
   }, [firestore, user?.uid]);
 
   const { data: projects, isLoading } = useCollection(projectsQuery);
 
-  const filteredProjects = projects?.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Client-side sorting and filtering
+  const processedProjects = useMemo(() => {
+    if (!projects) return [];
+    
+    // 1. Filter by search term
+    const filtered = projects.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      p.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // 2. Sort by createdAt (descending)
+    return [...filtered].sort((a, b) => {
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateB - dateA;
+    });
+  }, [projects, searchTerm]);
 
   return (
     <AppShell>
@@ -71,9 +84,9 @@ export default function ProjectsPage() {
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <p className="text-muted-foreground font-medium">Loading your projects...</p>
           </div>
-        ) : filteredProjects && filteredProjects.length > 0 ? (
+        ) : processedProjects && processedProjects.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {filteredProjects.map((project) => (
+            {processedProjects.map((project) => (
               <Card key={project.id} className="group overflow-hidden glass-card hover:border-primary/50 transition-all duration-300">
                 <div className="relative h-48 w-full overflow-hidden bg-secondary/20">
                   <Image 
