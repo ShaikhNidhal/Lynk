@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo, use } from "react";
 import { useUser, useFirebase, useCollection, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy } from "firebase/firestore";
+import { collection, doc, query, where } from "firebase/firestore";
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
 import { TaskCard } from "@/components/tasks/task-card";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
@@ -35,17 +35,19 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   }, [firestore, projectId]);
   const { data: project, isLoading: isProjectLoading } = useDoc(projectRef);
 
-  // 2. Fetch Tasks
+  // 2. Fetch Tasks with QAP filter
   const tasksQuery = useMemoFirebase(() => {
-    if (!firestore || !projectId) return null;
+    if (!firestore || !projectId || !user?.uid) return null;
+    // We must include the where filter to satisfy security rules (QAP)
+    // We avoid server-side orderBy to prevent index explosion on dynamic member keys
     return query(
       collection(firestore, "projects", projectId, "tasks"),
-      orderBy("createdAt", "desc")
+      where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, projectId]);
-  const { data: tasks, isLoading: isTasksLoading } = useCollection(tasksQuery);
+  }, [firestore, projectId, user?.uid]);
+  const { data: rawTasks, isLoading: isTasksLoading } = useCollection(tasksQuery);
 
-  // 3. Organize tasks into columns
+  // 3. Client-side sorting and column organization
   const columns = useMemo(() => {
     const defaultCols = [
       { id: "todo", title: "To Do", tasks: [] as any[] },
@@ -53,15 +55,22 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       { id: "done", title: "Done", tasks: [] as any[] }
     ];
 
-    if (!tasks) return defaultCols;
+    if (!rawTasks) return defaultCols;
 
-    tasks.forEach(task => {
+    // Sort tasks by createdAt desc
+    const sortedTasks = [...rawTasks].sort((a, b) => {
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateB - dateA;
+    });
+
+    sortedTasks.forEach(task => {
       const col = defaultCols.find(c => c.id === (task.status?.toLowerCase() || "todo"));
       if (col) col.tasks.push(task);
     });
 
     return defaultCols;
-  }, [tasks]);
+  }, [rawTasks]);
 
   const handleTaskClick = (task: any) => {
     setSelectedTask(task);

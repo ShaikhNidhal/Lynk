@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Sheet, 
   SheetContent, 
@@ -27,7 +27,7 @@ import {
   Check
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -55,16 +55,26 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
 
-  // Fetch Subtasks
+  // Fetch Subtasks with QAP filter
   const subtasksQuery = useMemoFirebase(() => {
-    if (!firestore || !projectId || !task?.id) return null;
+    if (!firestore || !projectId || !task?.id || !user?.uid) return null;
     return query(
       collection(firestore, "projects", projectId, "tasks", task.id, "subtasks"),
-      orderBy("createdAt", "asc")
+      where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, projectId, task?.id]);
+  }, [firestore, projectId, task?.id, user?.uid]);
 
-  const { data: subtasks, isLoading: isSubtasksLoading } = useCollection(subtasksQuery);
+  const { data: rawSubtasks, isLoading: isSubtasksLoading } = useCollection(subtasksQuery);
+
+  // Client-side sort subtasks
+  const subtasks = useMemo(() => {
+    if (!rawSubtasks) return [];
+    return [...rawSubtasks].sort((a, b) => {
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateA - dateB; // asc
+    });
+  }, [rawSubtasks]);
 
   const handleAddSubtask = (title: string) => {
     if (!title.trim() || !firestore || !projectId || !task?.id) return;

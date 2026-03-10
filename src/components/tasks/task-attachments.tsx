@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Paperclip, 
   File, 
@@ -12,7 +13,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -34,15 +35,26 @@ export function TaskAttachments({ projectId, taskId, projectMembers }: TaskAttac
   const [formData, setFormData] = useState({ name: "", url: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Fetch attachments with QAP filter
   const attachmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !projectId || !taskId) return null;
+    if (!firestore || !projectId || !taskId || !user?.uid) return null;
     return query(
       collection(firestore, "projects", projectId, "tasks", taskId, "attachments"),
-      orderBy("createdAt", "desc")
+      where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, projectId, taskId]);
+  }, [firestore, projectId, taskId, user?.uid]);
 
-  const { data: attachments, isLoading } = useCollection(attachmentsQuery);
+  const { data: rawAttachments, isLoading } = useCollection(attachmentsQuery);
+
+  // Client-side sort attachments
+  const attachments = useMemo(() => {
+    if (!rawAttachments) return [];
+    return [...rawAttachments].sort((a, b) => {
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateB - dateA; // desc
+    });
+  }, [rawAttachments]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();

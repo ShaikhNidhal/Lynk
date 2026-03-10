@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   MessageSquare, 
   Send, 
@@ -8,7 +9,7 @@ import {
   User
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,15 +29,26 @@ export function TaskComments({ projectId, taskId, projectMembers }: TaskComments
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Fetch comments with QAP filter
   const commentsQuery = useMemoFirebase(() => {
-    if (!firestore || !projectId || !taskId) return null;
+    if (!firestore || !projectId || !taskId || !user?.uid) return null;
     return query(
       collection(firestore, "projects", projectId, "tasks", taskId, "comments"),
-      orderBy("createdAt", "asc")
+      where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, projectId, taskId]);
+  }, [firestore, projectId, taskId, user?.uid]);
 
-  const { data: comments, isLoading } = useCollection(commentsQuery);
+  const { data: rawComments, isLoading } = useCollection(commentsQuery);
+
+  // Client-side sort comments by time
+  const comments = useMemo(() => {
+    if (!rawComments) return [];
+    return [...rawComments].sort((a, b) => {
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateA - dateB; // asc
+    });
+  }, [rawComments]);
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
