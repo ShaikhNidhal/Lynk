@@ -32,6 +32,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { doc } from "firebase/firestore";
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 
 const SidebarMock = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(true);
@@ -172,10 +173,14 @@ const TopNav = () => {
           <Bell className="w-5 h-5 text-muted-foreground" />
           <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-card"></span>
         </Button>
-        <Button className="hidden sm:flex gap-2 shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90">
-          <Plus className="w-4 h-4" />
-          New Project
-        </Button>
+        <CreateProjectDialog 
+          trigger={
+            <Button className="hidden sm:flex gap-2 shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90">
+              <Plus className="w-4 h-4" />
+              New Project
+            </Button>
+          }
+        />
       </div>
     </header>
   );
