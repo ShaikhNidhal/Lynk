@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -9,7 +10,10 @@ import {
   AlertCircle, 
   TrendingUp,
   ArrowRight,
-  Loader2
+  Loader2,
+  Users,
+  Briefcase,
+  Zap
 } from "lucide-react";
 import { 
   BarChart, 
@@ -19,32 +23,45 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell
+  Cell,
+  Legend
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useUser, useDoc, useFirebase, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useDoc, useFirebase, useMemoFirebase, useCollection } from "@/firebase";
+import { doc, collection, query, where } from "firebase/firestore";
 
 const workloadData = [
-  { name: "Alice", tasks: 8, capacity: 10 },
-  { name: "Bob", tasks: 12, capacity: 10 },
-  { name: "Charlie", tasks: 5, capacity: 10 },
-  { name: "Diana", tasks: 9, capacity: 10 },
-  { name: "Ethan", tasks: 15, capacity: 10 },
+  { name: "Alice", tasks: 8, capacity: 10, availability: "Available" },
+  { name: "Bob", tasks: 12, capacity: 10, availability: "Overloaded" },
+  { name: "Charlie", tasks: 5, capacity: 10, availability: "Available" },
+  { name: "Diana", tasks: 9, capacity: 10, availability: "Busy" },
+  { name: "Ethan", tasks: 15, capacity: 10, availability: "Critical" },
 ];
 
 export default function DashboardPage() {
   const { user } = useUser();
   const { firestore } = useFirebase();
 
+  // 1. Fetch User Profile
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
   }, [firestore, user?.uid]);
+  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const { data: profile, isLoading } = useDoc(userProfileRef);
+  // 2. Fetch User's Projects
+  const projectsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(
+      collection(firestore, "projects"),
+      where(`members.${user.uid}`, "!=", null)
+    );
+  }, [firestore, user?.uid]);
+  const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
+
+  const isLoading = isProfileLoading || isProjectsLoading;
 
   if (isLoading) {
     return (
@@ -56,67 +73,98 @@ export default function DashboardPage() {
     );
   }
 
+  const activeProjectsCount = projects?.length || 0;
+  const recentProjects = projects?.slice(0, 4) || [];
+
   return (
     <AppShell>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Welcome back, {profile?.firstName || "User"}!
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Here&apos;s what&apos;s happening across your projects today.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Welcome back, {profile?.firstName || "User"}!
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Here's the current state of your resources and projects.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/time">View Timesheets</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href="/projects">Manage Boards</Link>
+            </Button>
+          </div>
         </div>
 
         {/* Stats Row */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard 
-            title="Total Projects" 
-            value="12" 
-            description="+2 from last month" 
-            icon={<FolderCheckIcon />} 
+            title="Assigned Projects" 
+            value={activeProjectsCount.toString()} 
+            description="Active workspaces" 
+            icon={<Briefcase className="text-primary" />} 
           />
           <StatCard 
-            title="Active Tasks" 
-            value="48" 
-            description="12 due this week" 
-            icon={<Clock className="text-blue-500" />} 
+            title="Team Availability" 
+            value="78%" 
+            description="Avg. capacity used" 
+            icon={<Users className="text-blue-500" />} 
           />
           <StatCard 
-            title="Completed" 
-            value="156" 
-            description="85% success rate" 
+            title="Milestones Met" 
+            value="24" 
+            description="This sprint" 
             icon={<CheckCircle2 className="text-green-500" />} 
           />
           <StatCard 
-            title="Critical Issues" 
-            value="3" 
-            description="Needs immediate attention" 
+            title="Utilization Alert" 
+            value="2" 
+            description="Members overloaded" 
             icon={<AlertCircle className="text-destructive" />} 
           />
         </div>
 
         <div className="grid gap-6 md:grid-cols-7">
           {/* Workload Visualization */}
-          <Card className="md:col-span-4 glass-card">
+          <Card className="md:col-span-4 glass-card border-primary/10">
             <CardHeader>
-              <CardTitle>Team Workload</CardTitle>
-              <CardDescription>Visualizing task allocation vs capacity (10 tasks/week)</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Resource Workload Analysis</CardTitle>
+                  <CardDescription>Task allocation vs. weekly capacity (Threshold: 10)</CardDescription>
+                </div>
+                <Zap className="w-5 h-5 text-accent animate-pulse" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full mt-4">
+              <div className="h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={workloadData}>
+                  <BarChart data={workloadData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} />
-                    <Tooltip 
-                      cursor={{fill: 'transparent'}}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#6b7280', fontSize: 12}} 
                     />
-                    <Bar dataKey="tasks" radius={[4, 4, 0, 0]}>
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#6b7280', fontSize: 12}} 
+                    />
+                    <Tooltip 
+                      cursor={{fill: 'hsl(var(--secondary)/0.5)'}}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                    />
+                    <Legend verticalAlign="top" height={36}/>
+                    <Bar name="Current Tasks" dataKey="tasks" radius={[4, 4, 0, 0]}>
                       {workloadData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.tasks > entry.capacity ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'} />
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.tasks > entry.capacity ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'} 
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -125,41 +173,92 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Projects */}
+          {/* Team Availability Status */}
           <Card className="md:col-span-3 glass-card">
+            <CardHeader>
+              <CardTitle>Team Status & Availability</CardTitle>
+              <CardDescription>Real-time availability monitoring</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {workloadData.map((member) => (
+                  <div key={member.name} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center font-bold text-primary border border-primary/10">
+                        {member.name[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{member.name}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                          {member.tasks} active tasks
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={member.availability === "Critical" || member.availability === "Overloaded" ? "destructive" : "secondary"}
+                      className="px-2 py-0.5 text-[10px]"
+                    >
+                      {member.availability}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-8 pt-6 border-t border-border">
+                <Button variant="outline" className="w-full gap-2 text-xs font-bold uppercase tracking-widest" asChild>
+                  <Link href="/team">
+                    Full Resource Planner <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* My Recent Projects */}
+          <Card className="md:col-span-7 glass-card border-accent/10">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Active Projects</CardTitle>
-                <CardDescription>Track project velocity and health</CardDescription>
+                <CardTitle>My Active Projects</CardTitle>
+                <CardDescription>Direct access to your assigned boards</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/projects" className="text-primary hover:underline flex items-center gap-1">
-                  View All <ArrowRight className="w-4 h-4" />
+                <Link href="/projects" className="text-primary hover:underline flex items-center gap-1 font-bold text-xs uppercase tracking-wider">
+                  View All Boards <ArrowRight className="w-3 h-3" />
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <ProjectProgress 
-                name="Mobile App Redesign" 
-                progress={75} 
-                status="Healthy" 
-              />
-              <ProjectProgress 
-                name="Cloud Migration" 
-                progress={45} 
-                status="At Risk" 
-                variant="destructive"
-              />
-              <ProjectProgress 
-                name="Q3 Marketing Campaign" 
-                progress={90} 
-                status="Ahead" 
-              />
-              <ProjectProgress 
-                name="Security Audit" 
-                progress={20} 
-                status="On Track" 
-              />
+            <CardContent>
+              {recentProjects.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {recentProjects.map((project) => (
+                    <Link key={project.id} href={`/projects/${project.id}`}>
+                      <div className="p-4 rounded-xl border border-border bg-white hover:border-primary/40 hover:shadow-md transition-all group">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <Zap className="w-4 h-4" />
+                          </div>
+                          <Badge variant="outline" className="text-[10px]">{project.type}</Badge>
+                        </div>
+                        <h4 className="font-bold text-sm truncate group-hover:text-primary transition-colors">{project.name}</h4>
+                        <div className="mt-4 space-y-2">
+                           <div className="flex justify-between text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">
+                             <span>Health</span>
+                             <span className="text-green-600">{project.status}</span>
+                           </div>
+                           <Progress value={65} className="h-1.5" />
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 text-center bg-secondary/20 rounded-xl border-2 border-dashed">
+                  <Briefcase className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground font-medium">No projects assigned yet.</p>
+                  <Button variant="link" asChild className="mt-2">
+                    <Link href="/projects">Create your first project</Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -170,46 +269,21 @@ export default function DashboardPage() {
 
 function StatCard({ title, value, description, icon }: { title: string, value: string, description: string, icon: React.ReactNode }) {
   return (
-    <Card className="glass-card overflow-hidden">
+    <Card className="glass-card overflow-hidden border-primary/5">
       <CardContent className="p-6">
         <div className="flex items-center justify-between space-y-0 pb-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
           <div className="h-4 w-4 text-muted-foreground">
             {icon}
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 text-green-500" />
+          <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium italic">
             {description}
           </p>
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function ProjectProgress({ name, progress, status, variant = "default" }: { name: string, progress: number, status: string, variant?: "default" | "destructive" }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-foreground">{name}</span>
-        <Badge variant={variant === "destructive" ? "destructive" : "secondary"}>
-          {status}
-        </Badge>
-      </div>
-      <Progress value={progress} className="h-2" />
-      <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-        <span>Progress</span>
-        <span>{progress}%</span>
-      </div>
-    </div>
-  );
-}
-
-function FolderCheckIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="m9 13 2 2 4-4"/></svg>
   );
 }
