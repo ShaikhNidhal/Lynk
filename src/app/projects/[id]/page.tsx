@@ -8,7 +8,8 @@ import {
   Filter, 
   Settings, 
   Loader2,
-  ChevronRight
+  ChevronRight,
+  Share2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
@@ -18,6 +19,7 @@ import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
 import { TaskCard } from "@/components/tasks/task-card";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProjectMembersDialog } from "@/components/projects/project-members-dialog";
 
 export default function ProjectBoardPage({ params }: { params: { id: string } }) {
   const { id: projectId } = params;
@@ -119,6 +121,13 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
                 </div>
               )}
             </div>
+            
+            <ProjectMembersDialog 
+              projectId={projectId} 
+              projectName={project.name} 
+              currentMembers={project.members || {}} 
+            />
+
             <Button variant="outline" size="sm" className="gap-2 bg-white">
               <Filter className="w-4 h-4" />
               Filter

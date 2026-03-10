@@ -1,14 +1,15 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger
+  DialogDescription, 
+  DialogFooter, 
+  DialogTrigger 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +28,18 @@ export function InviteMemberDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
   
   const [formData, setFormData] = useState({
     email: "",
     role: "Team Member",
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setInviteLink(`${window.location.origin}/register`);
+    }
+  }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +58,8 @@ export function InviteMemberDialog() {
   };
 
   const copyInviteLink = () => {
-    const link = `${window.location.origin}/register`;
-    navigator.clipboard.writeText(link);
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink);
     setCopied(true);
     toast({
       title: "Link Copied",
@@ -63,12 +71,12 @@ export function InviteMemberDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 shadow-lg shadow-primary/20">
+        <Button className="gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
           <UserPlus className="w-4 h-4" />
           Invite Member
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[450px] glass-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="w-5 h-5 text-primary" />
@@ -112,12 +120,12 @@ export function InviteMemberDialog() {
 
           <div className="pt-4 border-t">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
-              Or share registration link
+              Share registration link
             </Label>
             <div className="flex gap-2">
               <Input 
                 readOnly 
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/register`}
+                value={inviteLink}
                 className="bg-secondary/30 text-xs font-mono"
               />
               <Button type="button" variant="outline" size="icon" onClick={copyInviteLink}>

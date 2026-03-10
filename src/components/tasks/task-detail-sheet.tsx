@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -21,7 +22,9 @@ import {
   ListTodo,
   MessageSquare,
   Paperclip,
-  Info
+  Info,
+  Share2,
+  Check
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
@@ -50,6 +53,7 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
   const { firestore } = useFirebase();
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   // Fetch Subtasks
   const subtasksQuery = useMemoFirebase(() => {
@@ -103,7 +107,6 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
       updatedAt: serverTimestamp(),
     });
 
-    // Notify project members (simulated for project owner in this example)
     if (task.ownerId && task.ownerId !== user?.uid) {
       createNotification(
         firestore, 
@@ -116,28 +119,43 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
     toast({ title: "Status Updated", description: `Task is now ${newStatus}` });
   };
 
+  const copyTaskLink = () => {
+    if (typeof window === "undefined") return;
+    const link = `${window.location.origin}/projects/${projectId}?task=${task.id}`;
+    navigator.clipboard.writeText(link);
+    setIsCopying(true);
+    toast({ title: "Task Link Copied" });
+    setTimeout(() => setIsCopying(false), 2000);
+  };
+
   if (!task) return null;
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[600px] p-0 flex flex-col">
+      <SheetContent className="sm:max-w-[600px] p-0 flex flex-col glass-card">
         <div className="p-6 pb-0">
           <SheetHeader className="space-y-4">
             <div className="flex items-center justify-between">
-              <Badge variant={task.priority === "High" || task.priority === "Critical" ? "destructive" : "default"} className="uppercase text-[10px] font-bold">
-                {task.priority}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={task.priority === "High" || task.priority === "Critical" ? "destructive" : "default"} className="uppercase text-[10px] font-bold">
+                  {task.priority}
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={copyTaskLink} className="h-7 gap-1.5 text-[10px] uppercase font-bold text-muted-foreground hover:text-primary">
+                  {isCopying ? <Check className="w-3 h-3 text-green-500" /> : <Share2 className="w-3 h-3" />}
+                  Share
+                </Button>
+              </div>
               <div className="flex gap-2">
                 <SelectStatus currentStatus={task.status} onStatusChange={handleUpdateStatus} />
               </div>
             </div>
-            <SheetTitle className="text-2xl font-bold leading-tight">{task.title}</SheetTitle>
+            <SheetTitle className="text-2xl font-bold leading-tight text-foreground">{task.title}</SheetTitle>
           </SheetHeader>
         </div>
 
         <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0 mt-6">
           <div className="px-6">
-            <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
+            <TabsList className="grid w-full grid-cols-3 bg-secondary/30">
               <TabsTrigger value="details" className="gap-2">
                 <Info className="w-3.5 h-3.5" /> Details
               </TabsTrigger>
@@ -150,7 +168,7 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
             </TabsList>
           </div>
 
-          <Separator className="my-4" />
+          <Separator className="my-4 opacity-50" />
 
           <div className="flex-1 overflow-y-auto px-6 pb-24">
             <TabsContent value="details" className="mt-0 space-y-8">
@@ -180,7 +198,7 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="opacity-50" />
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -242,8 +260,10 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
                         onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(newSubtaskTitle)}
                         autoFocus
                       />
-                      <Button size="sm" onClick={() => handleAddSubtask(newSubtaskTitle)}>Add</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)}>Cancel</Button>
+                      <div className="flex gap-1">
+                        <Button size="sm" onClick={() => handleAddSubtask(newSubtaskTitle)}>Add</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setIsAddingSubtask(false)}>Cancel</Button>
+                      </div>
                     </div>
                   ) : (
                     <Button 
