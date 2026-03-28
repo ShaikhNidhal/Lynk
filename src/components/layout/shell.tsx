@@ -36,6 +36,17 @@ import { CreateProjectDialog } from "@/components/projects/create-project-dialog
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+const Logo = ({ className }: { className?: string }) => (
+  <div className={cn("flex items-center", className)}>
+    <div className="bg-black text-white px-2 py-0.5 font-mono font-bold tracking-tighter text-xs sm:text-sm flex items-center gap-1 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+      <span className="font-['VT323'] text-lg sm:text-xl">TOUCH GRASS</span>
+      <div className="bg-white text-black px-1 py-0 border border-black text-[10px] leading-none">
+        {">_"}
+      </div>
+    </div>
+  </div>
+);
+
 const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (open: boolean) => void }) => {
   const { user } = useUser();
   const { firestore } = useFirebase();
@@ -61,11 +72,8 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 mb-4">
-        <Link href="/dashboard" onClick={onItemClick} className={cn("flex items-center gap-2 font-bold text-primary transition-all", !open && "opacity-0 invisible w-0 lg:opacity-100 lg:visible lg:w-auto")}>
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-md">
-            <FolderKanban className="w-5 h-5" />
-          </div>
-          <span className="text-xl tracking-tight">Lynk</span>
+        <Link href="/dashboard" onClick={onItemClick} className={cn("flex items-center gap-2 transition-all", !open && "opacity-0 invisible w-0 lg:opacity-100 lg:visible lg:w-auto")}>
+          <Logo />
         </Link>
       </div>
       

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FolderKanban, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
@@ -53,7 +53,7 @@ export default function RegisterPage() {
 
       toast({
         title: "Registration Successful",
-        description: `Welcome to Lynk, ${formData.firstName}!`,
+        description: `Welcome to Touch Grass, ${formData.firstName}!`,
       });
       
       // Redirect to welcome splash screens instead of dashboard
@@ -71,14 +71,17 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md glass-card">
+      <Card className="w-full max-w-md glass-card border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <CardHeader className="space-y-1 flex flex-col items-center">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white mb-4 shadow-lg shadow-primary/20">
-            <FolderKanban className="w-6 h-6" />
+          <div className="bg-black text-white px-4 py-2 font-mono font-bold tracking-tighter flex items-center gap-2 mb-6">
+            <span className="font-['VT323'] text-3xl">TOUCH GRASS</span>
+            <div className="bg-white text-black px-1.5 py-0.5 border border-black text-sm">
+              {">_"}
+            </div>
           </div>
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
           <CardDescription>
-            Enter your details to get started with Lynk
+            Enter your details to get started
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleRegister}>
@@ -92,6 +95,7 @@ export default function RegisterPage() {
                   required 
                   value={formData.firstName}
                   onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                  className="border-2 border-black"
                 />
               </div>
               <div className="space-y-2">
@@ -102,6 +106,7 @@ export default function RegisterPage() {
                   required 
                   value={formData.lastName}
                   onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                  className="border-2 border-black"
                 />
               </div>
             </div>
@@ -114,6 +119,7 @@ export default function RegisterPage() {
                 required 
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
+                className="border-2 border-black"
               />
             </div>
             <div className="space-y-2">
@@ -124,6 +130,7 @@ export default function RegisterPage() {
                 required 
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
+                className="border-2 border-black"
               />
             </div>
             <div className="space-y-2">
@@ -132,7 +139,7 @@ export default function RegisterPage() {
                 value={formData.role} 
                 onValueChange={(value) => setFormData({...formData, role: value})}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-2 border-black">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -145,13 +152,13 @@ export default function RegisterPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11" disabled={loading}>
+            <Button type="submit" className="w-full bg-black text-white hover:bg-black/90 h-11 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Register
             </Button>
             <div className="text-sm text-center text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline font-medium">
+              <Link href="/login" className="text-primary hover:underline font-bold">
                 Sign in
               </Link>
             </div>
