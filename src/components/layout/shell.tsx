@@ -15,7 +15,8 @@ import {
   Plus,
   Clock,
   Loader2,
-  Terminal
+  Terminal,
+  Handshake
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
         <NavItem icon={<LayoutDashboard />} label="Dashboard" href="/dashboard" open={open} onClick={onItemClick} />
         <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
         <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
+        <NavItem icon={<Handshake />} label="Clients" href="/clients" open={open} onClick={onItemClick} />
         <NavItem icon={<Users />} label="Team" href="/team" open={open} onClick={onItemClick} />
         <div className="pt-4 mt-4 border-t border-border">
           <NavItem icon={<Settings />} label="Settings" href="/settings" open={open} onClick={onItemClick} />
