@@ -22,14 +22,15 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Handshake, Loader2, UserPlus, FolderKanban } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { doc, serverTimestamp, collection, query, where, updateDoc } from "firebase/firestore";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, serverTimestamp, collection, query, where } from "firebase/firestore";
+import { setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export function AddClientDialog() {
   const { user } = useUser();
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -49,47 +50,53 @@ export function AddClientDialog() {
     );
   }, [firestore, user?.uid]);
   
-  const { data: projects } = useCollection(projectsQuery);
+  const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !user) return;
     setLoading(true);
 
-    // 1. Create the Client User Profile
-    const clientId = `client_${Math.random().toString(36).substring(2, 11)}`;
-    const clientRef = doc(firestore, "users", clientId);
-    
-    setDocumentNonBlocking(clientRef, {
-      id: clientId,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      role: "Client",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
+    try {
+      // 1. Create the Client User Profile
+      const clientId = `client_${Math.random().toString(36).substring(2, 11)}`;
+      const clientRef = doc(firestore, "users", clientId);
+      
+      setDocumentNonBlocking(clientRef, {
+        id: clientId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: "Client",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
-    // 2. Assign to Project if selected
-    if (formData.initialProjectId !== "none") {
-      const projectRef = doc(firestore, "projects", formData.initialProjectId);
-      // We use standard updateDoc for the nested map update
-      updateDoc(projectRef, {
-        [`members.${clientId}`]: 'client',
-        updatedAt: serverTimestamp()
-      }).catch(err => {
-        console.error("Failed to assign client to project:", err);
+      // 2. Assign to Project if selected
+      if (formData.initialProjectId !== "none") {
+        const projectRef = doc(firestore, "projects", formData.initialProjectId);
+        updateDocumentNonBlocking(projectRef, {
+          [`members.${clientId}`]: 'client',
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      toast({
+        title: "Client Onboarded",
+        description: `${formData.firstName} ${formData.lastName} has been added and linked to the workspace.`,
       });
+      
+      setIsOpen(false);
+      setFormData({ firstName: "", lastName: "", email: "", initialProjectId: "none" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to onboard client. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-
-    toast({
-      title: "Client Onboarded",
-      description: `${formData.firstName} ${formData.lastName} has been added and assigned to the workspace.`,
-    });
-    
-    setIsOpen(false);
-    setFormData({ firstName: "", lastName: "", email: "", initialProjectId: "none" });
-    setLoading(false);
   };
 
   return (
@@ -155,7 +162,7 @@ export function AddClientDialog() {
               onValueChange={(val) => setFormData({...formData, initialProjectId: val})}
             >
               <SelectTrigger id="project">
-                <SelectValue placeholder="Select a project..." />
+                <SelectValue placeholder={isProjectsLoading ? "Loading projects..." : "Select a project..."} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No project yet</SelectItem>
