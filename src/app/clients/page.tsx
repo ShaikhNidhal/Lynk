@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Building, Loader2, Handshake, ExternalLink, FolderKanban } from "lucide-react";
+import { Search, Mail, Building, Loader2, Handshake, ExternalLink, FolderKanban, UserCog } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, limit, where } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { AddClientDialog } from "@/components/clients/add-client-dialog";
+import { EditClientDialog } from "@/components/clients/edit-client-dialog";
 import Link from "next/link";
 
 export default function ClientsPage() {
@@ -97,6 +98,16 @@ export default function ClientsPage() {
                           </AvatarFallback>
                         </Avatar>
                       </div>
+                      <div className="absolute top-2 right-2">
+                        <EditClientDialog 
+                          client={client} 
+                          trigger={
+                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                              <UserCog className="w-3.5 h-3.5 text-accent" />
+                            </Button>
+                          }
+                        />
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-10 pb-6 px-6">
@@ -153,9 +164,7 @@ export default function ClientsPage() {
                       <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest italic">
                         External Portal
                       </div>
-                      <Button variant="ghost" size="sm" className="text-[9px] h-7 font-bold uppercase tracking-wider hover:text-accent hover:bg-accent/5">
-                        Full History
-                      </Button>
+                      <EditClientDialog client={client} />
                     </div>
                   </CardContent>
                 </Card>
