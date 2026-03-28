@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Shield, Loader2 } from "lucide-react";
+import { Search, Mail, Shield, Loader2, Users as UsersIcon } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
@@ -19,18 +19,21 @@ export default function TeamPage() {
 
   const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, "users"), limit(50));
+    return query(collection(firestore, "users"), limit(100));
   }, [firestore]);
 
   const { data: users, isLoading } = useCollection(usersQuery);
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
+    // Filter out Clients from the Team Directory
     return users.filter(u => 
-      u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.role?.toLowerCase().includes(searchTerm.toLowerCase())
+      u.role !== "Client" && (
+        u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.role?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     );
   }, [users, searchTerm]);
 
@@ -40,7 +43,7 @@ export default function TeamPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Team Directory</h1>
-            <p className="text-muted-foreground mt-1">View and manage your organization's members.</p>
+            <p className="text-muted-foreground mt-1">View and manage your organization's internal members.</p>
           </div>
           <InviteMemberDialog />
         </div>
@@ -108,7 +111,10 @@ export default function TeamPage() {
           </div>
         ) : (
           <div className="text-center py-20 bg-white/50 rounded-2xl border-2 border-dashed border-border">
-            <p className="text-muted-foreground font-medium italic">No members found matching your search.</p>
+            <UsersIcon className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground">No members found</h3>
+            <p className="text-muted-foreground mb-4">Try adjusting your search or inviting new members to the team.</p>
+            <InviteMemberDialog />
           </div>
         )}
       </div>
