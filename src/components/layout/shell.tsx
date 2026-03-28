@@ -14,7 +14,8 @@ import {
   X, 
   Plus,
   Clock,
-  Loader2
+  Loader2,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,13 +38,11 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const Logo = ({ className }: { className?: string }) => (
-  <div className={cn("flex items-center", className)}>
-    <div className="bg-black text-white px-2 py-0.5 font-mono font-bold tracking-tighter text-xs sm:text-sm flex items-center gap-1 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-      <span className="font-['VT323'] text-lg sm:text-xl">TOUCH GRASS</span>
-      <div className="bg-white text-black px-1 py-0 border border-black text-[10px] leading-none">
-        {">_"}
-      </div>
+  <div className={cn("flex items-center gap-2", className)}>
+    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
+      <Zap className="w-5 h-5 fill-current" />
     </div>
+    <span className="text-xl font-bold tracking-tight text-foreground">Lynk</span>
   </div>
 );
 
