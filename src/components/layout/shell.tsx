@@ -15,7 +15,7 @@ import {
   Plus,
   Clock,
   Loader2,
-  Zap
+  Terminal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,10 +37,23 @@ import { CreateProjectDialog } from "@/components/projects/create-project-dialog
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+const LogoIcon = ({ className }: { className?: string }) => (
+  <svg 
+    viewBox="0 0 32 32" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={cn("w-full h-full", className)}
+  >
+    <rect x="3" y="3" width="26" height="26" rx="2" stroke="currentColor" strokeWidth="3.5" />
+    <path d="M10 11L16 16L10 21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="18" y1="21" x2="24" y2="21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+  </svg>
+);
+
 const Logo = ({ className }: { className?: string }) => (
   <div className={cn("flex items-center gap-2", className)}>
-    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
-      <Zap className="w-5 h-5 fill-current" />
+    <div className="w-8 h-8 flex items-center justify-center text-primary">
+      <LogoIcon />
     </div>
     <span className="text-xl font-bold tracking-tight text-foreground">Lynk</span>
   </div>

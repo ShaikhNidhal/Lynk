@@ -16,12 +16,24 @@ import {
   Sparkles, 
   Users, 
   ArrowRight,
-  Zap,
   ShieldCheck,
   LayoutDashboard
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+
+const LogoIcon = ({ className }: { className?: string }) => (
+  <svg 
+    viewBox="0 0 32 32" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={cn("w-full h-full", className)}
+  >
+    <rect x="3" y="3" width="26" height="26" rx="2" stroke="currentColor" strokeWidth="3.5" />
+    <path d="M10 11L16 16L10 21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="18" y1="21" x2="24" y2="21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+  </svg>
+);
 
 const splashScreens = [
   {
@@ -86,7 +98,9 @@ export default function WelcomeSplashPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-4 left-4 sm:bottom-8 sm:left-8 text-white z-10">
             <div className="flex items-center gap-2 mb-1 sm:mb-2">
-              <Zap className="w-4 h-4 text-accent fill-accent" />
+              <div className="w-4 h-4 text-accent">
+                <LogoIcon />
+              </div>
               <span className="text-[10px] font-bold uppercase tracking-widest font-mono">LYNK SYSTEM V2.5</span>
             </div>
             <p className="text-[10px] sm:text-sm font-medium opacity-90 italic">"Get your work done seamlessly."</p>
@@ -97,8 +111,8 @@ export default function WelcomeSplashPage() {
         <div className="flex-1 p-6 sm:p-8 md:p-12 flex flex-col justify-between gap-8 md:gap-0">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
-                <Zap className="w-5 h-5 fill-current" />
+              <div className="w-8 h-8 flex items-center justify-center text-primary">
+                <LogoIcon />
               </div>
               <span className="text-xl font-bold tracking-tight text-foreground">Lynk</span>
             </div>
