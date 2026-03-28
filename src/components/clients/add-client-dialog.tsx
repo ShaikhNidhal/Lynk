@@ -14,10 +14,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Handshake, Loader2, Mail, UserPlus } from "lucide-react";
+import { Handshake, Loader2, UserPlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useFirebase } from "@/firebase";
+import { doc, serverTimestamp } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export function AddClientDialog() {
+  const { firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -29,19 +33,31 @@ export function AddClientDialog() {
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!firestore) return;
     setLoading(true);
 
-    // Simulate onboarding a client
-    // In a real app, this would create a user document with role: 'Client'
-    setTimeout(() => {
-      setLoading(false);
-      toast({
-        title: "Client Onboarded",
-        description: `${formData.firstName} ${formData.lastName} has been added as a Client stakeholder.`,
-      });
-      setIsOpen(false);
-      setFormData({ firstName: "", lastName: "", email: "" });
-    }, 1500);
+    // Generate a random ID for the placeholder client profile
+    const clientId = `client_${Math.random().toString(36).substring(2, 11)}`;
+    const clientRef = doc(firestore, "users", clientId);
+    
+    setDocumentNonBlocking(clientRef, {
+      id: clientId,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      role: "Client",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    toast({
+      title: "Client Onboarded",
+      description: `${formData.firstName} ${formData.lastName} has been added as a Client stakeholder.`,
+    });
+    
+    setIsOpen(false);
+    setFormData({ firstName: "", lastName: "", email: "" });
+    setLoading(false);
   };
 
   return (

@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -44,6 +45,10 @@ service cloud.firestore {
       return isSignedIn() && data.members != null && data.members[request.auth.uid] != null;
     }
 
+    function isProjectOwner(data) {
+      return isSignedIn() && data.members != null && data.members[request.auth.uid] == 'owner';
+    }
+
     // Validates that the data matches the path for relational integrity
     function matchesPath(field, pathId) {
       return field == pathId;
@@ -54,11 +59,11 @@ service cloud.firestore {
     /**
      * @description Rules for the UserProfile entity. 
      * Any signed-in user can view other profiles for the Team Directory.
-     * Only Admins or the owner can update.
+     * Only Admins, Project Managers, or the owner can create/update.
      */
     match /users/{userId} {
       allow get, list: if isSignedIn();
-      allow create: if isOwner(userId) && matchesPath(request.resource.data.id, userId);
+      allow create: if (isOwner(userId) || hasGlobalRole('Admin') || hasGlobalRole('Project Manager')) && matchesPath(request.resource.data.id, userId);
       allow update: if (isOwner(userId) || hasGlobalRole('Admin')) && resource != null;
       allow delete: if hasGlobalRole('Admin') && resource != null;
 
@@ -79,7 +84,7 @@ service cloud.firestore {
       allow get, list: if isProjectMember(resource.data);
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] != null;
       allow update: if isProjectMember(resource.data) && resource != null;
-      allow delete: if (resource.data.members[request.auth.uid] == 'owner' || hasGlobalRole('Admin')) && resource != null;
+      allow delete: if (isProjectOwner(resource.data) || hasGlobalRole('Admin')) && resource != null;
 
       /**
        * @description Tasks within a project.
