@@ -121,7 +121,7 @@ export default function WelcomeSplashPage() {
             </Button>
           </div>
 
-          <Carousel setApi={setApi} className="w-full">
+          <Carousel setApi={setApi} className="w-full flex-1 flex flex-col justify-between">
             <CarouselContent>
               {splashScreens.map((screen, index) => (
                 <CarouselItem key={index}>
@@ -139,39 +139,39 @@ export default function WelcomeSplashPage() {
                 </CarouselItem>
               ))}
             </CarouselContent>
-          </Carousel>
 
-          <div className="space-y-4 sm:space-y-6">
-            <div className="flex gap-2">
-              {splashScreens.map((_, i) => (
-                <div 
-                  key={i} 
-                  className={cn(
-                    "h-1.5 transition-all duration-300 rounded-full",
-                    current === i ? "w-8 sm:w-12 bg-primary" : "w-2 sm:w-2 bg-muted"
-                  )}
-                />
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
+            <div className="space-y-4 sm:space-y-6 mt-8">
               <div className="flex gap-2">
-                <CarouselPrevious className="static translate-y-0 h-9 w-9 sm:h-11 sm:w-11" />
-                {!isLast && <CarouselNext className="static translate-y-0 h-9 w-9 sm:h-11 sm:w-11" />}
+                {splashScreens.map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "h-1.5 transition-all duration-300 rounded-full",
+                      current === i ? "w-8 sm:w-12 bg-primary" : "w-2 sm:w-2 bg-muted"
+                    )}
+                  />
+                ))}
               </div>
-              
-              <Button 
-                onClick={isLast ? handleFinish : () => api?.scrollNext()} 
-                className={cn(
-                  "flex-1 h-10 sm:h-12 font-bold text-xs sm:text-sm transition-all gap-2 shadow-lg",
-                  isLast ? "bg-accent text-accent-foreground hover:bg-accent/90" : "bg-primary text-white"
-                )}
-              >
-                {isLast ? "Get Started" : "Continue"}
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex gap-2">
+                  <CarouselPrevious className="static translate-y-0 h-9 w-9 sm:h-11 sm:w-11" />
+                  {!isLast && <CarouselNext className="static translate-y-0 h-9 w-9 sm:h-11 sm:w-11" />}
+                </div>
+                
+                <Button 
+                  onClick={isLast ? handleFinish : () => api?.scrollNext()} 
+                  className={cn(
+                    "flex-1 h-10 sm:h-12 font-bold text-xs sm:text-sm transition-all gap-2 shadow-lg",
+                    isLast ? "bg-accent text-accent-foreground hover:bg-accent/90" : "bg-primary text-white"
+                  )}
+                >
+                  {isLast ? "Get Started" : "Continue"}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
+          </Carousel>
         </div>
       </div>
       
