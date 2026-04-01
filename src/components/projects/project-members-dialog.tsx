@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -22,7 +21,7 @@ import {
   X,
   Shield
 } from "lucide-react";
-import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirebase, useUser, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, query, limit, doc, serverTimestamp } from "firebase/firestore";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
