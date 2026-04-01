@@ -14,6 +14,7 @@ import { doc, serverTimestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 import { 
   User, 
   Settings as SettingsIcon, 
