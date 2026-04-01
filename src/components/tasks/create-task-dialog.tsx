@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Loader2, User } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, serverTimestamp, query, where, limit } from "firebase/firestore";
+import { collection, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,6 +53,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
 
   // Fetch profiles for project members to show names in the selector
   const memberIds = useMemo(() => Object.keys(projectMembers || {}), [projectMembers]);
+  
   const usersQuery = useMemoFirebase(() => {
     if (!firestore || memberIds.length === 0) return null;
     // Note: 'in' queries are limited to 30 items in Firestore
@@ -62,7 +63,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
     );
   }, [firestore, memberIds]);
 
-  const { data: members } = useCollection(usersQuery);
+  const { data: members, isLoading: isMembersLoading } = useCollection(usersQuery);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +122,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] glass-card">
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
           <DialogDescription>
@@ -130,44 +131,47 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         </DialogHeader>
         <form onSubmit={handleCreate} className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Task Title</Label>
+            <Label htmlFor="title" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Task Title</Label>
             <Input 
               id="title" 
               placeholder="e.g., Design System Update" 
               required 
               value={formData.title}
               onChange={(e) => setFormData({...formData, title: e.target.value})}
+              className="bg-white/50"
             />
           </div>
+          
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Description</Label>
             <Textarea 
               id="description" 
               placeholder="What needs to be done?" 
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
+              className="bg-white/50 min-h-[100px]"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="assignee">Assignee</Label>
+            <Label htmlFor="assignee" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignee</Label>
             <Select 
               value={formData.assignedToId} 
               onValueChange={(value) => setFormData({...formData, assignedToId: value})}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select assignee" />
+              <SelectTrigger className="bg-white/50">
+                <SelectValue placeholder={isMembersLoading ? "Loading members..." : "Select assignee"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 {members?.map(m => (
                   <SelectItem key={m.id} value={m.id}>
                     <div className="flex items-center gap-2">
-                      <Avatar className="w-5 h-5">
+                      <Avatar className="w-5 h-5 border">
                         <AvatarImage src={`https://picsum.photos/seed/${m.id}/50/50`} />
-                        <AvatarFallback>{m.firstName?.[0]}</AvatarFallback>
+                        <AvatarFallback className="text-[10px]">{m.firstName?.[0]}</AvatarFallback>
                       </Avatar>
-                      <span>{m.firstName} {m.lastName}</span>
+                      <span className="text-sm">{m.firstName} {m.lastName}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -177,12 +181,12 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
+              <Label htmlFor="priority" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Priority</Label>
               <Select 
                 value={formData.priority} 
                 onValueChange={(value) => setFormData({...formData, priority: value})}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white/50">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -194,12 +198,12 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</Label>
               <Select 
                 value={formData.status} 
                 onValueChange={(value) => setFormData({...formData, status: value})}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white/50">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -210,21 +214,23 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
               </Select>
             </div>
           </div>
+          
           <div className="space-y-2">
-            <Label htmlFor="dueDate">Due Date (Optional)</Label>
+            <Label htmlFor="dueDate" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Due Date (Optional)</Label>
             <Input 
               id="dueDate" 
               type="date" 
               value={formData.dueDate}
               onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+              className="bg-white/50"
             />
           </div>
 
-          <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+          <DialogFooter className="pt-4 gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="font-bold uppercase tracking-widest text-xs">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button type="submit" disabled={loading} className="gap-2 font-bold uppercase tracking-widest text-xs shadow-lg shadow-primary/20">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               Create Task
             </Button>
