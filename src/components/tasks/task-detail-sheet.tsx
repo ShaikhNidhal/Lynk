@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { 
   Clock, 
   Calendar, 
-  User, 
+  User as UserIcon, 
   Plus, 
   Trash2, 
   Loader2,
@@ -24,9 +24,10 @@ import {
   Paperclip,
   Info,
   Share2,
-  Check
+  Check,
+  UserCheck
 } from "lucide-react";
-import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirebase, useUser, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, doc, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { format } from "date-fns";
@@ -39,6 +40,8 @@ import { TaskAttachments } from "@/components/tasks/task-attachments";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createNotification } from "@/lib/notifications";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TaskDetailSheetProps {
   isOpen: boolean;
@@ -54,6 +57,28 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+
+  // Fetch Assignee Profile
+  const assigneeRef = useMemoFirebase(() => {
+    if (!firestore || !task?.assignedToId) return null;
+    return doc(firestore, "users", task.assignedToId);
+  }, [firestore, task?.assignedToId]);
+  const { data: assigneeProfile } = useDoc(assigneeRef);
+
+  // Fetch Creator Profile
+  const creatorRef = useMemoFirebase(() => {
+    if (!firestore || !task?.ownerId) return null;
+    return doc(firestore, "users", task.ownerId);
+  }, [firestore, task?.ownerId]);
+  const { data: creatorProfile } = useDoc(creatorRef);
+
+  // Fetch potential assignees (Project Members)
+  const memberIds = useMemo(() => Object.keys(projectMembers || {}), [projectMembers]);
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || memberIds.length === 0) return null;
+    return query(collection(firestore, "users"), where("id", "in", memberIds.slice(0, 30)));
+  }, [firestore, memberIds]);
+  const { data: members } = useCollection(membersQuery);
 
   // Fetch Subtasks with QAP filter
   const subtasksQuery = useMemoFirebase(() => {
@@ -129,6 +154,27 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
     toast({ title: "Status Updated", description: `Task is now ${newStatus}` });
   };
 
+  const handleUpdateAssignee = (newAssigneeId: string) => {
+    if (!firestore || !projectId || !task?.id) return;
+    const taskRef = doc(firestore, "projects", projectId, "tasks", task.id);
+    updateDocumentNonBlocking(taskRef, {
+      assignedToId: newAssigneeId === "unassigned" ? null : newAssigneeId,
+      updatedAt: serverTimestamp(),
+    });
+
+    if (newAssigneeId !== "unassigned" && newAssigneeId !== user?.uid) {
+      createNotification(
+        firestore,
+        newAssigneeId,
+        'assignment',
+        `You have been assigned to: ${task.title}`,
+        `/projects/${projectId}`
+      );
+    }
+
+    toast({ title: "Assignee Updated" });
+  };
+
   const copyTaskLink = () => {
     if (typeof window === "undefined") return;
     const link = `${window.location.origin}/projects/${projectId}?task=${task.id}`;
@@ -190,20 +236,66 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
               </div>
 
               <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <UserCheck className="w-3 h-3 text-primary" /> Assignee
+                  </span>
+                  <Select 
+                    value={task.assignedToId || "unassigned"} 
+                    onValueChange={handleUpdateAssignee}
+                  >
+                    <SelectTrigger className="h-9 w-full bg-white/50 border-primary/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members?.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="w-5 h-5">
+                              <AvatarImage src={`https://picsum.photos/seed/${m.id}/50/50`} />
+                              <AvatarFallback>{m.firstName?.[0]}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs">{m.firstName} {m.lastName}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <Calendar className="w-3 h-3 text-primary" /> Due Date
                   </span>
-                  <p className="text-sm font-medium">
+                  <p className="text-sm font-medium pt-1.5">
                     {task.dueDate ? format(new Date(task.dueDate), "PPP") : "No due date"}
                   </p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <User className="w-3 h-3 text-primary" /> Created By
+                    <UserIcon className="w-3 h-3 text-primary" /> Created By
                   </span>
-                  <p className="text-sm font-medium">
-                    User {task.ownerId?.slice(0, 4)}...
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <Avatar className="w-5 h-5">
+                      <AvatarImage src={`https://picsum.photos/seed/${task.ownerId}/50/50`} />
+                      <AvatarFallback>{creatorProfile?.firstName?.[0] || '?'}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-medium">
+                      {creatorProfile ? `${creatorProfile.firstName} ${creatorProfile.lastName}` : "Loading..."}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-primary" /> Created
+                  </span>
+                  <p className="text-sm font-medium pt-1.5 text-muted-foreground italic">
+                    {task.createdAt?.seconds 
+                      ? format(new Date(task.createdAt.seconds * 1000), "MMM d, yyyy") 
+                      : "Just now"}
                   </p>
                 </div>
               </div>

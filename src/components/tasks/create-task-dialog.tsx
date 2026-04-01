@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -22,11 +22,12 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, Calendar } from "lucide-react";
-import { useFirebase, useUser } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { Plus, Loader2, User } from "lucide-react";
+import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, serverTimestamp, query, where, limit } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface CreateTaskDialogProps {
   projectId: string;
@@ -47,7 +48,21 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
     priority: "Medium",
     status: initialStatus,
     dueDate: "",
+    assignedToId: "unassigned",
   });
+
+  // Fetch profiles for project members to show names in the selector
+  const memberIds = useMemo(() => Object.keys(projectMembers || {}), [projectMembers]);
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore || memberIds.length === 0) return null;
+    // Note: 'in' queries are limited to 30 items in Firestore
+    return query(
+      collection(firestore, "users"),
+      where("id", "in", memberIds.slice(0, 30))
+    );
+  }, [firestore, memberIds]);
+
+  const { data: members } = useCollection(usersQuery);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +79,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         priority: formData.priority,
         dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
         ownerId: user.uid,
+        assignedToId: formData.assignedToId === "unassigned" ? null : formData.assignedToId,
         projectId: projectId,
         members: projectMembers, // Denormalize project members for RBAC
         createdAt: serverTimestamp(),
@@ -81,7 +97,8 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         description: "", 
         priority: "Medium", 
         status: initialStatus,
-        dueDate: "" 
+        dueDate: "",
+        assignedToId: "unassigned"
       });
     } catch (error: any) {
       toast({
@@ -131,6 +148,33 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="assignee">Assignee</Label>
+            <Select 
+              value={formData.assignedToId} 
+              onValueChange={(value) => setFormData({...formData, assignedToId: value})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {members?.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="w-5 h-5">
+                        <AvatarImage src={`https://picsum.photos/seed/${m.id}/50/50`} />
+                        <AvatarFallback>{m.firstName?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <span>{m.firstName} {m.lastName}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>

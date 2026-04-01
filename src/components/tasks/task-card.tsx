@@ -5,9 +5,11 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, MessageSquare, Paperclip, ChevronDown, Clock, Calendar } from "lucide-react";
+import { MoreVertical, Clock, Calendar, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { useFirebase, useDoc, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 
 interface TaskCardProps {
   task: any;
@@ -15,6 +17,16 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onClick }: TaskCardProps) {
+  const { firestore } = useFirebase();
+  
+  // Resolve assignee profile if exists
+  const assigneeRef = useMemoFirebase(() => {
+    if (!firestore || !task.assignedToId) return null;
+    return doc(firestore, "users", task.assignedToId);
+  }, [firestore, task.assignedToId]);
+  
+  const { data: assignee } = useDoc(assigneeRef);
+
   const getPriorityVariant = (priority: string) => {
     switch (priority) {
       case "Critical": return "destructive";
@@ -56,13 +68,23 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
         <div className="flex items-center gap-3 text-muted-foreground">
           <div className="flex items-center gap-1 text-[11px]">
             <Clock className="w-3 h-3" />
-            {format(new Date(task.createdAt?.seconds * 1000 || Date.now()), "MMM d")}
+            {task.createdAt?.seconds 
+              ? format(new Date(task.createdAt.seconds * 1000), "MMM d") 
+              : "Just now"}
           </div>
         </div>
-        <Avatar className="w-6 h-6 border">
-          <AvatarImage src={`https://picsum.photos/seed/${task.ownerId}/100/100`} />
-          <AvatarFallback>U</AvatarFallback>
-        </Avatar>
+        <div className="flex items-center -space-x-1">
+          {assignee ? (
+            <Avatar title={`Assigned to ${assignee.firstName} ${assignee.lastName}`} className="w-6 h-6 border-2 border-white shadow-sm ring-1 ring-primary/10">
+              <AvatarImage src={`https://picsum.photos/seed/${assignee.id}/50/50`} />
+              <AvatarFallback className="text-[8px]">{assignee.firstName?.[0]}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="w-6 h-6 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-secondary/20" title="Unassigned">
+              <User className="w-3 h-3 text-muted-foreground/40" />
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );
