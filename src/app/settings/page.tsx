@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -144,6 +145,19 @@ export default function SettingsPage() {
     }
   };
 
+  const toggleNotification = (field: string, currentVal: boolean) => {
+    if (!firestore || !user?.uid) return;
+    const userRef = doc(firestore, "users", user.uid);
+    updateDocumentNonBlocking(userRef, {
+      [`notificationSettings.${field}`]: !currentVal,
+      updatedAt: serverTimestamp()
+    });
+    toast({
+      title: "Alert Settings Updated",
+      description: "Your notification preferences have been saved.",
+    });
+  };
+
   if (isLoading) {
     return (
       <AppShell>
@@ -155,6 +169,11 @@ export default function SettingsPage() {
   }
 
   const role = profile?.role || "Team Member";
+  const notificationSettings = profile?.notificationSettings || {
+    emailSummaries: true,
+    inAppAlerts: true,
+    securityAlerts: true
+  };
 
   return (
     <AppShell>
@@ -317,7 +336,7 @@ export default function SettingsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-foreground/80 leading-relaxed border-l-2 border-primary/30 pl-4 py-1 italic">
+                  <p className="text-sm text-foreground/80 leading-relaxed border-l-2 border-primary/30 pol-4 py-1 italic">
                     {role === "Admin" && "As an Administrator, you have full control over organization users, project billing, and global settings. You can manage roles and view all system activity."}
                     {role === "Project Manager" && "You are responsible for board initialization, resource allocation, and team oversight. You can create projects, invite members, and manage deadlines."}
                     {role === "Team Member" && "You have access to assigned project boards, time tracking tools, and collaborative task features. Focus on execution and keep your board status updated."}
@@ -330,7 +349,7 @@ export default function SettingsPage() {
                       <CapabilityBadge label="View Boards" enabled />
                       <CapabilityBadge label="Comment" enabled />
                       <CapabilityBadge label="Manage Tasks" enabled={role !== "Client"} />
-                      <CapabilityBadge label="Create Projects" enabled={role === "Admin" || role === "Project Manager"} />
+                      <CapabilityBadge label="Create Projects" enabled={role === "Admin"} />
                       <CapabilityBadge label="Manage Team" enabled={role === "Admin"} />
                     </div>
                   </div>
@@ -346,9 +365,24 @@ export default function SettingsPage() {
                 <CardDescription>Configure how and when you want to be alerted.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <NotificationToggle label="Email Summaries" description="Get a daily digest of your task activity." defaultChecked />
-                <NotificationToggle label="In-App Alerts" description="Instant notifications for comments and assignments." defaultChecked />
-                <NotificationToggle label="Security Alerts" description="Notifications about login activity and account changes." defaultChecked />
+                <NotificationToggle 
+                  label="Email Summaries" 
+                  description="Get a daily digest of your task activity." 
+                  checked={notificationSettings.emailSummaries}
+                  onToggle={() => toggleNotification('emailSummaries', notificationSettings.emailSummaries)}
+                />
+                <NotificationToggle 
+                  label="In-App Alerts" 
+                  description="Instant notifications for comments and assignments." 
+                  checked={notificationSettings.inAppAlerts}
+                  onToggle={() => toggleNotification('inAppAlerts', notificationSettings.inAppAlerts)}
+                />
+                <NotificationToggle 
+                  label="Security Alerts" 
+                  description="Notifications about login activity and account changes." 
+                  checked={notificationSettings.securityAlerts}
+                  onToggle={() => toggleNotification('securityAlerts', notificationSettings.securityAlerts)}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -413,8 +447,7 @@ function CapabilityBadge({ label, enabled }: { label: string, enabled: boolean }
   );
 }
 
-function NotificationToggle({ label, description, defaultChecked = false }: { label: string, description: string, defaultChecked?: boolean }) {
-  const [checked, setChecked] = useState(defaultChecked);
+function NotificationToggle({ label, description, checked, onToggle }: { label: string, description: string, checked: boolean, onToggle: () => void }) {
   return (
     <div className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-secondary/5 transition-all group">
       <div className="space-y-1">
@@ -425,19 +458,10 @@ function NotificationToggle({ label, description, defaultChecked = false }: { la
         variant={checked ? "default" : "outline"} 
         size="sm" 
         className={cn("h-8 text-[10px] uppercase font-bold tracking-widest px-4 shadow-sm", checked ? "bg-primary" : "bg-white")}
-        onClick={() => setChecked(!checked)}
+        onClick={onToggle}
       >
         {checked ? "Enabled" : "Disabled"}
       </Button>
-    </div>
-  );
-}
-
-function StatItem({ value, label, color = "text-foreground" }: { value: string, label: string, color?: string }) {
-  return (
-    <div className="text-center">
-      <p className={cn("text-2xl font-bold tracking-tighter", color)}>{value}</p>
-      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest">{label}</p>
     </div>
   );
 }

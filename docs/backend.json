@@ -37,6 +37,15 @@
           "description": "An optional URL to the user's profile picture.",
           "format": "uri"
         },
+        "notificationSettings": {
+          "type": "object",
+          "description": "User's notification preferences.",
+          "properties": {
+            "emailSummaries": { "type": "boolean" },
+            "inAppAlerts": { "type": "boolean" },
+            "securityAlerts": { "type": "boolean" }
+          }
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp indicating when the user profile was created.",
