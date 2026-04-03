@@ -53,92 +53,55 @@
       },
       "required": ["name", "status"]
     },
-    "Contact": {
-      "title": "Contact",
-      "description": "An individual associated with a Company.",
-      "type": "object",
-      "properties": {
-        "companyId": { "type": "string" },
-        "companyName": { "type": "string" },
-        "firstName": { "type": "string" },
-        "lastName": { "type": "string" },
-        "email": { "type": "string" },
-        "phone": { "type": "string" },
-        "jobTitle": { "type": "string" },
-        "department": { "type": "string" },
-        "isPrimary": { "type": "boolean" },
-        "linkedinUrl": { "type": "string" },
-        "lastContactDate": { "type": "string", "format": "date-time" },
-        "notes": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Interaction": {
-      "title": "Interaction",
-      "description": "Communication record with a contact.",
-      "type": "object",
-      "properties": {
-        "contactId": { "type": "string" },
-        "type": { "type": "string", "enum": ["Call", "Email", "Meeting", "Other"] },
-        "notes": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "actorId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Deal": {
-      "title": "Deal",
-      "description": "A sales opportunity in the pipeline.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "companyId": { "type": "string" },
-        "companyName": { "type": "string" },
-        "value": { "type": "number" },
-        "currency": { "type": "string" },
-        "stageId": { "type": "string" },
-        "probability": { "type": "number" },
-        "expectedCloseDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Open", "Won", "Lost", "Stalled"] },
-        "source": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
     "Project": {
       "title": "Project",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
         "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
         "dealId": { "type": "string" },
         "description": { "type": "string" },
-        "status": { "type": "string" },
-        "priority": { "type": "string" },
+        "status": { "type": "string", "enum": ["Planning", "Active", "On Hold", "Completed", "Cancelled"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
         "type": { "type": "string" },
         "budget": { "type": "number" },
         "budgetSpent": { "type": "number" },
-        "healthStatus": { "type": "string" },
+        "healthStatus": { "type": "string", "enum": ["Good", "At Risk", "Critical"] },
         "startDate": { "type": "string", "format": "date" },
         "targetEndDate": { "type": "string", "format": "date" },
         "members": { "type": "object" },
         "settings": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Pending", "Achieved", "Missed"] },
+        "color": { "type": "string" },
         "createdAt": { "type": "string" }
       }
     },
-    "TimeEntry": {
-      "title": "TimeEntry",
-      "description": "Work log record.",
+    "Task": {
+      "title": "Task",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "projectId": { "type": "string" },
-        "taskId": { "type": "string" },
-        "duration": { "type": "number" },
-        "startedAt": { "type": "string", "format": "date-time" },
-        "endedAt": { "type": "string", "format": "date-time" },
+        "title": { "type": "string" },
         "description": { "type": "string" },
-        "isBillable": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "estimatedHours": { "type": "number" },
+        "actualHours": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "assignedToId": { "type": "string" },
+        "position": { "type": "number" },
+        "createdAt": { "type": "string" }
       }
     }
   },
@@ -149,13 +112,10 @@
     "structure": [
       { "path": "/workspaces/{workspaceId}", "definition": { "entityName": "Workspace" } },
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
-      { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
-      { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
-      { "path": "/contacts/{contactId}/interactions/{id}", "definition": { "entityName": "Interaction" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
-      { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
-      { "path": "/activityLogs/{logId}", "definition": { "entityName": "ActivityLog" } }
+      { "path": "/projects/{projectId}/milestones/{id}", "definition": { "entityName": "Milestone" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } }
     ]
   }
 }
