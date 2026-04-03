@@ -14,7 +14,8 @@ import {
   Trello,
   Flag,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  FolderOpen
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo, use } from "react";
@@ -30,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectTimeline } from "@/components/projects/project-timeline";
 import { ProjectAnalytics } from "@/components/projects/project-analytics";
+import { ProjectFiles } from "@/components/projects/project-files";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -187,9 +189,10 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
         {/* View Switcher */}
         <Tabs defaultValue="board" className="flex-1 flex flex-col min-h-0">
           <TabsList className="bg-secondary/20 p-1 self-start">
-            <TabsTrigger value="board" className="gap-2"><Trello className="w-4 h-4" /> Kanban</TabsTrigger>
-            <TabsTrigger value="timeline" className="gap-2"><Calendar className="w-4 h-4" /> Timeline</TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2"><BarChart2 className="w-4 h-4" /> Analytics</TabsTrigger>
+            <TabsTrigger value="board" className="gap-2"><Trello className="w-4 h-4" /> Board</TabsTrigger>
+            <TabsTrigger value="timeline" className="gap-2"><Calendar className="w-4 h-4" /> Roadmap</TabsTrigger>
+            <TabsTrigger value="files" className="gap-2"><FolderOpen className="w-4 h-4" /> Files</TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2"><BarChart2 className="w-4 h-4" /> Metrics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="board" className="flex-1 mt-6">
@@ -247,6 +250,10 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
 
           <TabsContent value="timeline" className="flex-1 mt-6">
             <ProjectTimeline projectId={projectId} tasks={rawTasks || []} milestones={milestones || []} />
+          </TabsContent>
+
+          <TabsContent value="files" className="flex-1 mt-6">
+            <ProjectFiles projectId={projectId} projectMembers={project.members} />
           </TabsContent>
 
           <TabsContent value="analytics" className="flex-1 mt-6">
