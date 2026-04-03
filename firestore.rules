@@ -8,7 +8,6 @@ service cloud.firestore {
     }
 
     function getGlobalRole() {
-      // Fetch the user's role from their profile document
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
@@ -20,9 +19,14 @@ service cloud.firestore {
       return isSignedIn() && (isAdmin() || (data.members != null && data.members[request.auth.uid] != null));
     }
 
-    // Ultimate Admin Access: If the user is an Admin, they can read/write any document.
+    // Ultimate Admin Access
     match /{document=**} {
       allow read, write: if isAdmin();
+    }
+
+    match /workspaces/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /users/{userId} {
@@ -34,23 +38,26 @@ service cloud.firestore {
       match /timeEntries/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
     }
 
-    match /companies/{companyId} {
-      allow read, write: if isSignedIn();
-      match /proposals/{proposalId} { allow read, write: if isSignedIn(); }
-      match /contacts/{contactId} { allow read, write: if isSignedIn(); }
-    }
-
-    match /contacts/{contactId} {
+    match /companies/{id} {
       allow read, write: if isSignedIn();
     }
 
-    match /deals/{dealId} {
+    match /contacts/{id} {
       allow read, write: if isSignedIn();
     }
 
-    match /templates/{id} {
+    match /pipelines/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /deals/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /activityLogs/{id} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
     }
 
     match /projects/{projectId} {
@@ -58,10 +65,6 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isMember(resource.data) || isAdmin();
       allow delete: if isAdmin();
-
-      match /budgets/{id} {
-        allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
-      }
 
       match /milestones/{id} {
         allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
@@ -72,7 +75,6 @@ service cloud.firestore {
         match /subtasks/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
         match /comments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
         match /attachments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
-        match /timeEntries/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
       }
     }
   }
