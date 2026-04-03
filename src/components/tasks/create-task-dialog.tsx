@@ -22,7 +22,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, User } from "lucide-react";
+import { Plus, Loader2, User, Clock } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -48,6 +48,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
     priority: "Medium",
     status: initialStatus,
     dueDate: "",
+    estimatedHours: "",
     assignedToId: "unassigned",
   });
 
@@ -56,7 +57,6 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
   
   const usersQuery = useMemoFirebase(() => {
     if (!firestore || memberIds.length === 0) return null;
-    // Note: 'in' queries are limited to 30 items in Firestore
     return query(
       collection(firestore, "users"),
       where("id", "in", memberIds.slice(0, 30))
@@ -79,10 +79,12 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         status: formData.status,
         priority: formData.priority,
         dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+        estimatedHours: Number(formData.estimatedHours) || 0,
+        actualHours: 0,
         ownerId: user.uid,
         assignedToId: formData.assignedToId === "unassigned" ? null : formData.assignedToId,
         projectId: projectId,
-        members: projectMembers, // Denormalize project members for RBAC
+        members: projectMembers, 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -99,6 +101,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         priority: "Medium", 
         status: initialStatus,
         dueDate: "",
+        estimatedHours: "",
         assignedToId: "unassigned"
       });
     } catch (error: any) {
@@ -153,30 +156,43 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="assignee" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignee</Label>
-            <Select 
-              value={formData.assignedToId} 
-              onValueChange={(value) => setFormData({...formData, assignedToId: value})}
-            >
-              <SelectTrigger className="bg-white/50">
-                <SelectValue placeholder={isMembersLoading ? "Loading members..." : "Select assignee"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {members?.map(m => (
-                  <SelectItem key={m.id} value={m.id}>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-5 h-5 border">
-                        <AvatarImage src={`https://picsum.photos/seed/${m.id}/50/50`} />
-                        <AvatarFallback className="text-[10px]">{m.firstName?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{m.firstName} {m.lastName}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="assignee" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignee</Label>
+              <Select 
+                value={formData.assignedToId} 
+                onValueChange={(value) => setFormData({...formData, assignedToId: value})}
+              >
+                <SelectTrigger className="bg-white/50">
+                  <SelectValue placeholder={isMembersLoading ? "Loading members..." : "Select assignee"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {members?.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-5 h-5 border">
+                          <AvatarImage src={`https://picsum.photos/seed/${m.id}/50/50`} />
+                          <AvatarFallback className="text-[10px]">{m.firstName?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{m.firstName} {m.lastName}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="estHours" className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5"><Clock className="w-3 h-3" /> Est. Hours</Label>
+              <Input 
+                id="estHours" 
+                type="number"
+                placeholder="0.0"
+                value={formData.estimatedHours}
+                onChange={(e) => setFormData({...formData, estimatedHours: e.target.value})}
+                className="bg-white/50"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

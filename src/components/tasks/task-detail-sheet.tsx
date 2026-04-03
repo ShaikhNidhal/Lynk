@@ -25,7 +25,10 @@ import {
   Info,
   Share2,
   Check,
-  UserCheck
+  UserCheck,
+  AlertTriangle,
+  History,
+  Timer
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, doc, serverTimestamp, query, where } from "firebase/firestore";
@@ -37,6 +40,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AIBreakdownButton } from "@/components/tasks/ai-breakdown-button";
 import { TaskComments } from "@/components/tasks/task-comments";
 import { TaskAttachments } from "@/components/tasks/task-attachments";
+import { TaskTimeLogs } from "@/components/tasks/task-time-logs";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createNotification } from "@/lib/notifications";
@@ -111,7 +115,7 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
       ownerId: user?.uid,
       projectId,
       taskId: task.id,
-      members: projectMembers, // Denormalize project members for RBAC
+      members: projectMembers, 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -132,6 +136,16 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
     if (!firestore || !projectId || !task?.id) return;
     const subtaskRef = doc(firestore, "projects", projectId, "tasks", task.id, "subtasks", subtaskId);
     deleteDocumentNonBlocking(subtaskRef);
+  };
+
+  const handleDeleteTask = () => {
+    if (!firestore || !projectId || !task?.id) return;
+    if (!confirm(`Are you sure you want to delete "${task.title}"? This cannot be undone.`)) return;
+
+    const taskRef = doc(firestore, "projects", projectId, "tasks", task.id);
+    deleteDocumentNonBlocking(taskRef);
+    toast({ title: "Task Deleted", variant: "destructive" });
+    onOpenChange(false);
   };
 
   const handleUpdateStatus = (newStatus: string) => {
@@ -203,6 +217,9 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
               </div>
               <div className="flex gap-2">
                 <SelectStatus currentStatus={task.status} onStatusChange={handleUpdateStatus} />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={handleDeleteTask}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </div>
             <SheetTitle className="text-2xl font-bold leading-tight text-foreground">{task.title}</SheetTitle>
@@ -211,15 +228,18 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
 
         <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0 mt-6">
           <div className="px-6">
-            <TabsList className="grid w-full grid-cols-3 bg-secondary/30">
-              <TabsTrigger value="details" className="gap-2">
-                <Info className="w-3.5 h-3.5" /> Details
+            <TabsList className="grid w-full grid-cols-4 bg-secondary/30 h-9 p-1">
+              <TabsTrigger value="details" className="gap-2 text-[10px] font-bold uppercase">
+                <Info className="w-3 h-3" /> Info
               </TabsTrigger>
-              <TabsTrigger value="comments" className="gap-2">
-                <MessageSquare className="w-3.5 h-3.5" /> Comments
+              <TabsTrigger value="time" className="gap-2 text-[10px] font-bold uppercase">
+                <Timer className="w-3 h-3" /> Time
               </TabsTrigger>
-              <TabsTrigger value="attachments" className="gap-2">
-                <Paperclip className="w-3.5 h-3.5" /> Files
+              <TabsTrigger value="comments" className="gap-2 text-[10px] font-bold uppercase">
+                <MessageSquare className="w-3 h-3" /> Chats
+              </TabsTrigger>
+              <TabsTrigger value="attachments" className="gap-2 text-[10px] font-bold uppercase">
+                <Paperclip className="w-3 h-3" /> Files
               </TabsTrigger>
             </TabsList>
           </div>
@@ -263,13 +283,14 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3 text-primary" /> Due Date
+                    <Clock className="w-3 h-3 text-primary" /> Est. Capacity
                   </span>
-                  <p className="text-sm font-medium pt-1.5">
-                    {task.dueDate ? format(new Date(task.dueDate), "PPP") : "No due date"}
-                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-sm font-bold">{task.estimatedHours || "0.0"} hrs</span>
+                    <Badge variant="outline" className="text-[9px] h-4">Target</Badge>
+                  </div>
                 </div>
               </div>
 
@@ -290,12 +311,10 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-primary" /> Created
+                    <Calendar className="w-3 h-3 text-primary" /> Due Date
                   </span>
-                  <p className="text-sm font-medium pt-1.5 text-muted-foreground italic">
-                    {task.createdAt?.seconds 
-                      ? format(new Date(task.createdAt.seconds * 1000), "MMM d, yyyy") 
-                      : "Just now"}
+                  <p className="text-sm font-medium pt-1.5">
+                    {task.dueDate ? format(new Date(task.dueDate), "PPP") : "No due date"}
                   </p>
                 </div>
               </div>
@@ -380,6 +399,14 @@ export function TaskDetailSheet({ isOpen, onOpenChange, task, projectId, project
                   )}
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="time" className="mt-0">
+              <TaskTimeLogs 
+                projectId={projectId} 
+                taskId={task.id} 
+                projectMembers={projectMembers} 
+              />
             </TabsContent>
 
             <TabsContent value="comments" className="mt-0">

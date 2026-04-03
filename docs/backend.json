@@ -101,6 +101,22 @@
         "dueDate": { "type": "string" },
         "assignedToId": { "type": "string" },
         "position": { "type": "number" },
+        "dependencies": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "TimeEntry": {
+      "title": "TimeEntry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number" },
+        "description": { "type": "string" },
+        "isBillable": { "type": "boolean" },
         "createdAt": { "type": "string" }
       }
     }
@@ -112,10 +128,12 @@
     "structure": [
       { "path": "/workspaces/{workspaceId}", "definition": { "entityName": "Workspace" } },
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
+      { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
       { "path": "/projects/{projectId}/milestones/{id}", "definition": { "entityName": "Milestone" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } }
+      { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } }
     ]
   }
 }
