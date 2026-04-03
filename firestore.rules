@@ -15,11 +15,7 @@ service cloud.firestore {
       return isSignedIn() && getGlobalRole() == 'Admin';
     }
 
-    function isMember(data) {
-      return isSignedIn() && (isAdmin() || (data.members != null && data.members[request.auth.uid] != null));
-    }
-
-    // Ultimate Admin Access
+    // Ultimate Admin Access - Recursive override for all collections
     match /{document=**} {
       allow read, write: if isAdmin();
     }
@@ -32,50 +28,32 @@ service cloud.firestore {
     match /users/{userId} {
       allow get, list: if isSignedIn();
       allow create, update: if isAdmin() || request.auth.uid == userId;
-      allow delete: if isAdmin();
       
-      match /notifications/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
       match /timeEntries/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
+      match /notifications/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
+    }
+
+    match /contacts/{id} {
+      allow read, write: if isSignedIn();
+      match /interactions/{intId} { allow read, write: if isSignedIn(); }
     }
 
     match /companies/{id} {
       allow read, write: if isSignedIn();
     }
 
-    match /contacts/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /pipelines/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
     match /deals/{id} {
       allow read, write: if isSignedIn();
+    }
+
+    match /projects/{id} {
+      allow read, write: if isSignedIn();
+      match /{allSub=**} { allow read, write: if isSignedIn(); }
     }
 
     match /activityLogs/{id} {
       allow read: if isAdmin();
       allow create: if isSignedIn();
-    }
-
-    match /projects/{projectId} {
-      allow read: if isMember(resource.data) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isMember(resource.data) || isAdmin();
-      allow delete: if isAdmin();
-
-      match /milestones/{id} {
-        allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
-      }
-
-      match /tasks/{taskId} {
-        allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
-        match /subtasks/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
-        match /comments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
-        match /attachments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
-      }
     }
   }
 }

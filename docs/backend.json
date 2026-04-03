@@ -73,16 +73,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "Pipeline": {
-      "title": "Pipeline",
-      "description": "Definition of sales stages.",
+    "Interaction": {
+      "title": "Interaction",
+      "description": "Communication record with a contact.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "type": { "type": "string" },
-        "stages": { "type": "array", "items": { "type": "object" } },
-        "isActive": { "type": "boolean" },
-        "workspaceId": { "type": "string" }
+        "contactId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Call", "Email", "Meeting", "Other"] },
+        "notes": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "actorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       }
     },
     "Deal": {
@@ -124,77 +125,6 @@
         "createdAt": { "type": "string" }
       }
     },
-    "Milestone": {
-      "title": "Milestone",
-      "description": "A significant point or event in a project.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "dueDate": { "type": "string", "format": "date" },
-        "completedDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Pending", "Achieved", "Missed"] },
-        "color": { "type": "string" },
-        "deliverables": { "type": "array", "items": { "type": "string" } },
-        "projectId": { "type": "string" }
-      }
-    },
-    "Task": {
-      "title": "Task",
-      "description": "An individual piece of work within a project.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "status": { "type": "string" },
-        "priority": { "type": "string" },
-        "type": { "type": "string" },
-        "position": { "type": "number" },
-        "estimatedHours": { "type": "number" },
-        "actualHours": { "type": "number" },
-        "dueDate": { "type": "string", "format": "date-time" },
-        "completedAt": { "type": "string", "format": "date-time" },
-        "assignedToId": { "type": "string" },
-        "ownerId": { "type": "string" },
-        "projectId": { "type": "string" },
-        "dependencies": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "Subtask": {
-      "title": "Subtask",
-      "description": "A smaller task nested under a main task.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "done"] },
-        "taskId": { "type": "string" },
-        "projectId": { "type": "string" }
-      }
-    },
-    "Comment": {
-      "title": "Comment",
-      "description": "A textual remark left on an entity.",
-      "type": "object",
-      "properties": {
-        "content": { "type": "string" },
-        "authorId": { "type": "string" },
-        "mentions": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Attachment": {
-      "title": "Attachment",
-      "description": "A file linked to an entity.",
-      "type": "object",
-      "properties": {
-        "fileName": { "type": "string" },
-        "fileUrl": { "type": "string" },
-        "mimeType": { "type": "string" },
-        "sizeBytes": { "type": "number" },
-        "uploaderId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
     "TimeEntry": {
       "title": "TimeEntry",
       "description": "Work log record.",
@@ -210,19 +140,6 @@
         "isBillable": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
-    },
-    "ActivityLog": {
-      "title": "ActivityLog",
-      "description": "Audit trail for workspace actions.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "action": { "type": "string" },
-        "entityType": { "type": "string" },
-        "entityId": { "type": "string" },
-        "changes": { "type": "object" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
     }
   },
   "auth": {
@@ -233,19 +150,12 @@
       { "path": "/workspaces/{workspaceId}", "definition": { "entityName": "Workspace" } },
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
       { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
-      { "path": "/users/{userId}/notifications/{id}", "definition": { "entityName": "object" } },
-      { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
       { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
-      { "path": "/pipelines/{pipelineId}", "definition": { "entityName": "Pipeline" } },
+      { "path": "/contacts/{contactId}/interactions/{id}", "definition": { "entityName": "Interaction" } },
+      { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
       { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
-      { "path": "/projects/{projectId}/milestones/{milestoneId}", "definition": { "entityName": "Milestone" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}/subtasks/{subtaskId}", "definition": { "entityName": "Subtask" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}/comments/{commentId}", "definition": { "entityName": "Comment" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}/attachments/{attachmentId}", "definition": { "entityName": "Attachment" } },
-      { "path": "/activityLogs/{logId}", "definition": { "entityName": "ActivityLog" } },
-      { "path": "/templates/{templateId}", "definition": { "entityName": "object" } }
+      { "path": "/activityLogs/{logId}", "definition": { "entityName": "ActivityLog" } }
     ]
   }
 }

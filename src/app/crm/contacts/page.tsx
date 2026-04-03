@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Contact as ContactIcon, Search, Plus, Mail, Phone, Building2, Loader2, Star } from "lucide-react";
+import { Contact as ContactIcon, Search, Plus, Mail, Phone, Building2, Loader2, Star, ExternalLink } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link";
+import { CreateContactDialog } from "@/components/crm/create-contact-dialog";
 
 export default function ContactsPage() {
   const { firestore } = useFirebase();
@@ -27,7 +29,8 @@ export default function ContactsPage() {
     if (!contacts) return [];
     return contacts.filter(c => 
       `${c.firstName} ${c.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [contacts, searchTerm]);
 
@@ -42,16 +45,13 @@ export default function ContactsPage() {
             </h1>
             <p className="text-muted-foreground mt-1">Manage individual stakeholders across all client accounts.</p>
           </div>
-          <Button className="gap-2 shadow-lg bg-primary">
-            <Plus className="w-4 h-4" />
-            Add Contact
-          </Button>
+          <CreateContactDialog />
         </div>
 
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by name or email..." 
+            placeholder="Search contacts, emails or companies..." 
             className="pl-9 bg-white border-none shadow-sm" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -73,7 +73,9 @@ export default function ContactsPage() {
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-base">{contact.firstName} {contact.lastName}</h3>
+                          <Link href={`/crm/contacts/${contact.id}`} className="hover:text-primary transition-colors">
+                            <h3 className="font-bold text-base">{contact.firstName} {contact.lastName}</h3>
+                          </Link>
                           {contact.isPrimary && <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" title="Primary Contact" />}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -94,8 +96,10 @@ export default function ContactsPage() {
                           {contact.phone}
                         </div>
                       )}
-                      <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-widest">
-                        View Interaction Log
+                      <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold uppercase tracking-widest">
+                        <Link href={`/crm/contacts/${contact.id}`}>
+                          Profile <ExternalLink className="w-3 h-3 ml-1.5" />
+                        </Link>
                       </Button>
                     </div>
                   </div>
@@ -108,7 +112,7 @@ export default function ContactsPage() {
             <ContactIcon className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">No contacts found</h3>
             <p className="text-muted-foreground mb-4">Start mapping stakeholders to your client companies.</p>
-            <Button className="gap-2"><Plus className="w-4 h-4" />Add First Contact</Button>
+            <CreateContactDialog />
           </div>
         )}
       </div>
