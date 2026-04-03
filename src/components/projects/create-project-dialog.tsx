@@ -22,16 +22,15 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, Users, Search, Check, X, Briefcase, Building2, DollarSign, Calendar } from "lucide-react";
+import { Plus, Loader2, Users, Search, X, Briefcase, Building2, DollarSign, Calendar } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, query, limit } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,7 +62,10 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !firestore) return;
+    if (!user || !firestore || !profile?.currentWorkspaceId) {
+      toast({ title: "No workspace active", variant: "destructive" });
+      return;
+    }
     setLoading(true);
 
     const membersMap: Record<string, string> = { [user.uid]: "owner" };
@@ -74,6 +76,7 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
     try {
       addDocumentNonBlocking(collection(firestore, "projects"), {
         ...formData,
+        workspaceId: profile.currentWorkspaceId,
         companyName: selectedCompany?.name || null,
         budget: Number(formData.budget) || null,
         budgetSpent: 0,

@@ -11,10 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 
 const LogoIcon = ({ className }: { className?: string }) => (
@@ -54,19 +53,7 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // 2. Create User Profile
-      const userRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userRef, {
-        id: user.uid,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        role: formData.role,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // 3. Create Workspace (Multi-tenant foundation)
+      // 2. Create Workspace
       const workspaceRef = doc(collection(firestore, "workspaces"));
       const workspaceId = workspaceRef.id;
       
@@ -80,10 +67,23 @@ export default function RegisterPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 4. Create Workspace Membership (RBAC link)
-      const memberRef = doc(collection(firestore, "workspaceMembers"));
+      // 3. Create User Profile with currentWorkspaceId
+      const userRef = doc(firestore, "users", user.uid);
+      setDocumentNonBlocking(userRef, {
+        id: user.uid,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: formData.role,
+        currentWorkspaceId: workspaceId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // 4. Create Workspace Membership (Nested sub-collection)
+      const memberRef = doc(firestore, "workspaces", workspaceId, "members", user.uid);
       setDocumentNonBlocking(memberRef, {
-        id: memberRef.id,
+        id: user.uid,
         workspaceId: workspaceId,
         userId: user.uid,
         role: "owner",
@@ -95,14 +95,14 @@ export default function RegisterPage() {
 
       toast({
         title: "Registration Successful",
-        description: `Welcome to SprintFlow, ${formData.firstName}! Workspace "${formData.workspaceName || 'Personal'}" initialized.`,
+        description: `Welcome to SprintFlow, ${formData.firstName}! Workspace initialized.`,
       });
       
       router.push("/dashboard");
     } catch (error: any) {
       toast({
         title: "Registration Failed",
-        description: error.message || "Could not create account. Please try again.",
+        description: error.message || "Could not create account.",
         variant: "destructive",
       });
     } finally {

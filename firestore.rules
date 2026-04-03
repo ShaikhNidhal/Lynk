@@ -2,17 +2,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
+    // Helper functions
+    function isAuthenticated() {
       return request.auth != null;
     }
-
+    
     function getGlobalRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isAdmin() {
-      return isSignedIn() && getGlobalRole() == 'Admin';
+      return isAuthenticated() && getGlobalRole() == 'Admin';
     }
 
     // Ultimate Admin Access - Recursive override for all collections
@@ -20,40 +20,75 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    match /workspaces/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+    function isWorkspaceMember(workspaceId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+    
+    function hasWorkspaceRole(workspaceId, roles) {
+      return isWorkspaceMember(workspaceId) &&
+        get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role in roles;
+    }
+    
+    // Users - only self can edit
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if request.auth.uid == userId;
+    }
+    
+    // Workspaces - members only
+    match /workspaces/{workspaceId} {
+      allow read: if isWorkspaceMember(workspaceId);
+      allow create: if isAuthenticated();
+      allow update: if hasWorkspaceRole(workspaceId, ['owner', 'admin']);
+      
+      match /members/{memberId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin']);
+      }
+    }
+    
+    // Projects - workspace scoped
+    match /projects/{projectId} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow create: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']);
+      allow update: if hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']) ||
+        (resource.data.assignedTo == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'actualHours', 'completedAt'])); 
+      allow delete: if hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin']);
+      
+      match /{allSub=**} {
+        allow read: if isWorkspaceMember(get(/databases/$(database)/documents/projects/$(projectId)).data.workspaceId);
+        allow write: if hasWorkspaceRole(get(/databases/$(database)/documents/projects/$(projectId)).data.workspaceId, ['owner', 'admin', 'manager']);
+      }
     }
 
-    match /users/{userId} {
-      allow get, list: if isSignedIn();
-      allow create, update: if isAdmin() || request.auth.uid == userId;
-      
-      match /timeEntries/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
-      match /notifications/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
+    // CRM rules
+    match /companies/{id} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+    }
+    
+    match /deals/{id} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+    }
+
+    match /pipelines/{id} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
     }
 
     match /contacts/{id} {
-      allow read, write: if isSignedIn();
-      match /interactions/{intId} { allow read, write: if isSignedIn(); }
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
     }
-
-    match /companies/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /deals/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /projects/{id} {
-      allow read, write: if isSignedIn();
-      match /{allSub=**} { allow read, write: if isSignedIn(); }
-    }
-
-    match /activityLogs/{id} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn();
+    
+    // Activity logs - append-only
+    match /activity_logs/{logId} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
   }
 }

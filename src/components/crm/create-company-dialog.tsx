@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Plus, Loader2, Globe, MapPin } from "lucide-react";
+import { Building2, Plus, Loader2 } from "lucide-react";
 import { useFirebase, useUser } from "@/firebase";
 import { collection, serverTimestamp } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -22,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 
 export function CreateCompanyDialog() {
   const { firestore } = useFirebase();
+  const { profile } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -34,12 +35,13 @@ export function CreateCompanyDialog() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     try {
       await addDocumentNonBlocking(collection(firestore, "companies"), {
         ...formData,
+        workspaceId: profile.currentWorkspaceId,
         healthScore: 100,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

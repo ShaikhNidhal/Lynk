@@ -14,15 +14,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LineChart, Plus, Loader2, DollarSign } from "lucide-react";
-import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, serverTimestamp, doc } from "firebase/firestore";
+import { LineChart, Plus, Loader2 } from "lucide-react";
+import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CreateDealDialog({ initialPipelineId, initialStageId, trigger }: { initialPipelineId?: string, initialStageId?: string, trigger?: React.ReactNode }) {
   const { firestore } = useFirebase();
+  const { profile } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -46,7 +47,7 @@ export function CreateDealDialog({ initialPipelineId, initialStageId, trigger }:
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     const selectedCompany = companies?.find(c => c.id === formData.companyId);
@@ -56,6 +57,7 @@ export function CreateDealDialog({ initialPipelineId, initialStageId, trigger }:
       const dealRef = doc(collection(firestore, "deals"));
       setDocumentNonBlocking(dealRef, {
         id: dealRef.id,
+        workspaceId: profile.currentWorkspaceId,
         title: formData.title,
         companyId: formData.companyId,
         companyName: selectedCompany?.name || "Independent",

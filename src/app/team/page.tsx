@@ -6,44 +6,35 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Shield, Loader2, Users as UsersIcon, Building2, Circle } from "lucide-react";
-import { useFirebase, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
-import { collection, query, limit, where, doc } from "firebase/firestore";
+import { Search, Mail, Shield, Loader2, Users as UsersIcon } from "lucide-react";
+import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
+import { collection, query, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { MemberDetailsDialog } from "@/components/team/member-details-dialog";
 import { cn } from "@/lib/utils";
 
 export default function TeamPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { firestore } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 1. Fetch current user profile
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  const { data: profile } = useDoc(userProfileRef);
-
-  // 2. Fetch all users to show presence (mimics real-time status feed)
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "users"), limit(100));
-  }, [firestore]);
-  const { data: allUsers, isLoading: isUsersLoading } = useCollection(usersQuery);
+  // Fetch members from the workspace sub-collection
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "members"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  
+  const { data: members, isLoading: isMembersLoading } = useCollection(membersQuery);
 
   const filteredMembers = useMemo(() => {
-    if (!allUsers) return [];
-    return allUsers.filter(m => 
-      m.role !== "Client" && (
-        m.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    if (!members) return [];
+    return members.filter(m => 
+      m.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [allUsers, searchTerm]);
+  }, [members, searchTerm]);
 
   return (
     <AppShell>
@@ -69,7 +60,7 @@ export default function TeamPage() {
           />
         </div>
 
-        {isUsersLoading ? (
+        {isMembersLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <p className="text-muted-foreground font-medium">Syncing team directory...</p>
@@ -83,17 +74,11 @@ export default function TeamPage() {
                     <div className="absolute -bottom-10 left-6">
                       <div className="relative">
                         <Avatar className="w-20 h-20 border-4 border-white shadow-xl">
-                          <AvatarImage src={`https://picsum.photos/seed/${member.id}/200/200`} />
+                          <AvatarImage src={`https://picsum.photos/seed/${member.userId || member.id}/200/200`} />
                           <AvatarFallback className="text-xl font-bold bg-primary text-white">
                             {member.firstName?.[0]}{member.lastName?.[0]}
                           </AvatarFallback>
                         </Avatar>
-                        {/* Real-time Presence Badge */}
-                        <div className={cn(
-                          "absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white",
-                          member.presenceStatus === 'online' ? "bg-green-500" : 
-                          member.presenceStatus === 'away' ? "bg-yellow-500" : "bg-gray-300"
-                        )} title={member.presenceStatus || 'offline'} />
                       </div>
                     </div>
                   </div>
@@ -104,9 +89,6 @@ export default function TeamPage() {
                       <h3 className="font-bold text-lg text-foreground leading-tight group-hover:text-primary transition-colors truncate">
                         {member.firstName} {member.lastName}
                       </h3>
-                      <Badge variant="ghost" className="text-[9px] uppercase font-bold tracking-widest text-muted-foreground">
-                        {member.presenceStatus || 'offline'}
-                      </Badge>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                       <Mail className="w-3 h-3 text-primary" />
@@ -123,9 +105,9 @@ export default function TeamPage() {
 
                   <div className="mt-6 pt-4 border-t border-border flex justify-between items-center">
                     <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest italic">
-                      {member.presenceStatus === 'online' ? 'Active now' : `Last seen ${member.lastActive ? 'recently' : 'unknown'}`}
+                      Joined {member.joinedAt?.seconds ? new Date(member.joinedAt.seconds * 1000).toLocaleDateString() : 'recently'}
                     </div>
-                    <MemberDetailsDialog memberId={member.id} />
+                    <MemberDetailsDialog memberId={member.userId || member.id} />
                   </div>
                 </CardContent>
               </Card>

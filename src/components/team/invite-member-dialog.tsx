@@ -24,12 +24,12 @@ import {
 import { UserPlus, Loader2, Copy, Check, Mail, ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useFirebase, useUser } from "@/firebase";
-import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { serverTimestamp, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export function InviteMemberDialog() {
   const { firestore } = useFirebase();
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -50,40 +50,28 @@ export function InviteMemberDialog() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     try {
-      // 1. Create a WorkspaceMember record (The "Invite" in this architecture)
-      const memberId = `member_${Math.random().toString(36).substring(2, 11)}`;
-      const memberRef = doc(firestore, "workspaceMembers", memberId);
+      const memberId = `invite_${Math.random().toString(36).substring(2, 11)}`;
+      const memberRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "members", memberId);
       
       setDocumentNonBlocking(memberRef, {
         id: memberId,
+        userId: memberId,
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        role: formData.role.toLowerCase().replace(/\s+/g, '-'),
+        role: formData.role,
         invitedById: user?.uid,
         status: "pending",
         joinedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 2. Also create a shadow User profile so they appear in lists
-      const userRef = doc(firestore, "users", memberId);
-      setDocumentNonBlocking(userRef, {
-        id: memberId,
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        role: formData.role,
-        isPlaceholder: true,
-        createdAt: serverTimestamp(),
-      }, { merge: true });
-
       toast({
         title: "Invitation Processed",
-        description: `${formData.email} has been added to the workspace pending registration.`,
+        description: `${formData.email} has been added to the workspace.`,
       });
       
       setIsOpen(false);

@@ -14,18 +14,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings2, Plus, Loader2, X, Palette } from "lucide-react";
+import { Settings2, Plus, Loader2, X } from "lucide-react";
 import { useFirebase, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
-
-const COLORS = [
-  "bg-blue-500", "bg-purple-500", "bg-orange-500", "bg-pink-500", "bg-green-500", "bg-yellow-500", "bg-red-500", "bg-cyan-500"
-];
+import { cn } from "@/lib/utils";
 
 export function CreatePipelineDialog() {
   const { firestore } = useFirebase();
+  const { profile } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
@@ -49,13 +47,14 @@ export function CreatePipelineDialog() {
   };
 
   const handleCreate = async () => {
-    if (!firestore || !name) return;
+    if (!firestore || !name || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     try {
       const pipelineRef = doc(collection(firestore, "pipelines"));
       setDocumentNonBlocking(pipelineRef, {
         id: pipelineRef.id,
+        workspaceId: profile.currentWorkspaceId,
         name,
         stages,
         createdAt: serverTimestamp(),
@@ -99,7 +98,7 @@ export function CreatePipelineDialog() {
               </Button>
             </div>
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-              {stages.map((stage, idx) => (
+              {stages.map((stage) => (
                 <div key={stage.id} className="flex items-center gap-3 p-3 bg-secondary/10 rounded-lg group">
                   <div className={cn("w-4 h-4 rounded-full shrink-0", stage.color)} />
                   <Input 
