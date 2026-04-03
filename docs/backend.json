@@ -66,6 +66,24 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "TimeEntry": {
+      "title": "TimeEntry",
+      "description": "A record of time spent on a specific project or task.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "taskId": { "type": "string" },
+        "taskTitle": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "projectId", "duration", "createdAt"]
     }
   },
   "auth": {
@@ -83,7 +101,17 @@
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores individual user profiles, identified by their Firebase Auth UID. Each document contains the user's global 'role' for RBAC. Access is generally restricted to the user themselves for read/update, with broader access for 'Admin' roles. The 'userId' parameter corresponds to 'request.auth.uid'."
+          "description": "Stores individual user profiles."
+        }
+      },
+      {
+        "path": "/users/{userId}/timeEntries/{entryId}",
+        "definition": {
+          "entityName": "TimeEntry",
+          "schema": {
+            "$ref": "#/backend/entities/TimeEntry"
+          },
+          "description": "User-specific time logs for global tracking views."
         }
       },
       {
@@ -93,152 +121,9 @@
           "schema": {
             "$ref": "#/backend/entities/Project"
           },
-          "description": "Top-level collection for collaborative projects. Each document includes an 'ownerId' (creator's UID) and a 'members' map (`{uid: 'project_role'}`) for explicit authorization independence. This map facilitates QAPs by allowing direct rule evaluation for project access based on the authenticated user's UID and their role within that specific project. (Assumes a 'Project' entity schema with `name`, `description`, `ownerId`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier for a project."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/tasks/{taskId}",
-        "definition": {
-          "entityName": "Task",
-          "schema": {
-            "$ref": "#/backend/entities/Task"
-          },
-          "description": "Stores tasks belonging to a specific project. Each document includes `projectId` (from path for efficient querying), `ownerId` (task creator), `assignedToId` (if assigned), and explicitly denormalizes the `members` map from its parent `Project` document for authorization independence. This enables secure QAPs for listing tasks within a project. (Assumes a 'Task' entity schema with `title`, `description`, `status`, `dueDate`, `priority`, `ownerId`, `assignedToId`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier of the parent project."
-            },
-            {
-              "name": "taskId",
-              "description": "Unique identifier for a task."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/tasks/{taskId}/subtasks/{subtaskId}",
-        "definition": {
-          "entityName": "Subtask",
-          "schema": {
-            "$ref": "#/backend/entities/Subtask"
-          },
-          "description": "Stores subtasks belonging to a specific task within a project. Each document includes `projectId`, `taskId` (from path for efficient querying), `ownerId` (subtask creator), `assignedToId` (if assigned), and explicitly denormalizes the `members` map from its grandparent `Project` document for authorization independence. (Assumes a 'Subtask' entity schema with `title`, `status`, `dueDate`, `priority`, `ownerId`, `assignedToId`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier of the grandparent project."
-            },
-            {
-              "name": "taskId",
-              "description": "Unique identifier of the parent task."
-            },
-            {
-              "name": "subtaskId",
-              "description": "Unique identifier for a subtask."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/tasks/{taskId}/comments/{commentId}",
-        "definition": {
-          "entityName": "Comment",
-          "schema": {
-            "$ref": "#/backend/entities/Comment"
-          },
-          "description": "Stores comments for tasks. Each document includes `projectId`, `taskId` (from path), `authorId` (commenter's UID), and denormalizes the `members` map from the grandparent `Project` document for authorization independence. (Assumes a 'Comment' entity schema with `content`, `authorId`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier of the grandparent project."
-            },
-            {
-              "name": "taskId",
-              "description": "Unique identifier of the parent task."
-            },
-            {
-              "name": "commentId",
-              "description": "Unique identifier for a comment."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/tasks/{taskId}/attachments/{attachmentId}",
-        "definition": {
-          "entityName": "Attachment",
-          "schema": {
-            "$ref": "#/backend/entities/Attachment"
-          },
-          "description": "Stores file attachments for tasks. Each document includes `projectId`, `taskId` (from path), `uploaderId` (uploader's UID), and denormalizes the `members` map from the grandparent `Project` document for authorization independence. (Assumes an 'Attachment' entity schema with `fileName`, `fileUrl`, `uploaderId`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier of the grandparent project."
-            },
-            {
-              "name": "taskId",
-              "description": "Unique identifier of the parent task."
-            },
-            {
-              "name": "attachmentId",
-              "description": "Unique identifier for an attachment."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{timeEntryId}",
-        "definition": {
-          "entityName": "TimeEntry",
-          "schema": {
-            "$ref": "#/backend/entities/TimeEntry"
-          },
-          "description": "Stores time tracking entries for tasks. Each document includes `projectId`, `taskId` (from path), `userId` (the user who logged time), and denormalizes the `members` map from the grandparent `Project` document for authorization independence. This allows for secure querying by project managers for their assigned projects. (Assumes a 'TimeEntry' entity schema with `userId`, `startTime`, `endTime`, `duration`, `description`, `members`, `createdAt`, `updatedAt`, etc.)",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "Unique identifier of the grandparent project."
-            },
-            {
-              "name": "taskId",
-              "description": "Unique identifier of the parent task."
-            },
-            {
-              "name": "timeEntryId",
-              "description": "Unique identifier for a time entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/notifications/{notificationId}",
-        "definition": {
-          "entityName": "Notification",
-          "schema": {
-            "$ref": "#/backend/entities/Notification"
-          },
-          "description": "Stores notifications specific to a user. Access is strictly private, restricted to the `userId` in the path (the recipient) for privacy and explicit ownership, supporting QAPs for listing personal notifications. (Assumes a 'Notification' entity schema with `recipientId`, `type`, `message`, `read`, `link`, `createdAt`, etc.)",
-          "params": [
-            {
-              "name": "userId",
-              "description": "Unique identifier of the recipient user."
-            },
-            {
-              "name": "notificationId",
-              "description": "Unique identifier for a notification."
-            }
-          ]
+          "description": "Top-level collection for collaborative projects."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed following the CORE DESIGN PRINCIPLES and DESIGN STRATEGY MANDATES to ensure a secure, scalable, and debuggable system with robust RBAC.\n\n**1. Authorization Independence via Denormalization (CRITICAL):**\nThis design primarily achieves Authorization Independence by denormalizing crucial authorization context. For collaborative entities like 'Project' and its nested subcollections ('Tasks', 'Subtasks', 'Comments', 'Attachments', 'TimeEntries'), the 'members' map from the parent 'Project' document is explicitly copied down into *every* document in these subcollections. This means that a security rule for a 'Task' document located at `/projects/{projectId}/tasks/{taskId}` can directly check `resource.data.members[request.auth.uid]` to determine access, without needing to perform a `get(/projects/{projectId})` call. This eliminates hierarchical authorization dependencies, supports atomic operations (like creating a project and its initial tasks in a single batch), and drastically simplifies security rules, making them more performant and easier to debug.\n\n**2. Structural Segregation for Homogeneous Security Posture:**\nCollections are structured such that all documents within a given collection share the same security requirements. For example, `/users/{userId}/notifications` is strictly private to the `userId` in the path, while `/projects/{projectId}` documents are collaborative and rely on an in-document 'members' map. This avoids mixing data with different access patterns in the same collection, simplifying rule logic (e.g., no need for complex `if/else` based on document content within a collection).\n\n**3. QAPs (Queries as a Policy) Support:**\nThe structure explicitly supports secure `list` operations (QAPs) by embedding the necessary authorization information directly within each document. \n*   For user-private data (e.g., `/users/{userId}/notifications`), the path itself (`{userId}`) acts as the filter, ensuring only notifications belonging to the authenticated user are returned by a `list` query. \n*   For collaborative data (e.g., `/projects/{projectId}`, `/projects/{projectId}/tasks/{taskId}`), each document includes the denormalized `members` map. When a client performs a `list` query on `/projects`, Firestore's security rules evaluate access for *each potential document*. Only documents where `request.auth.uid` is present in that document's `members` map will be returned, effectively filtering the list securely without requiring `get()` calls or client-side filtering. This makes `list` operations efficient and inherently secure.\n\n**4. DBAC (Database Access Control) & Global Roles:**\nGlobal user roles (Admin, Project Manager, Team Member, Client) are stored directly within the `/users/{userId}` `UserProfile` document in the `role` field. This adheres to the DBAC principle, relying solely on `request.auth.uid` for authentication and the `role` field in the database for authorization. Project-specific roles are managed within the denormalized `members` map.\n\n**5. Invariants and Data Clarity:**\nStandardized field names like `ownerId`, `assignedToId`, `createdAt`, `updatedAt`, and `status` (for explicit state modeling) are used across entities. Wildcards in paths are descriptive (e.g., `{projectId}`), and schemas are predictable. Ownership for private data is path-based (`/users/{userId}/...`). Collaboration relies on the `members` map. This radical consistency enhances debuggability and maintainability."
+    ]
   }
 }

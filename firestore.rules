@@ -3,19 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * SPRINTFLOW ACCESS CONTROL PHILOSOPHY
-     * 
-     * Core Philosophy:
-     * This ruleset implements a hybrid security model combining User Ownership, Global Role-Based 
-     * Access Control (RBAC), and Project-based Shared Access (Collaborators). 
-     * 
-     * Admin Override:
-     * Users with the global role of 'Admin' have full CRUD access to all documents across the database.
-     */
-
-    // --- Helper Functions ---
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -24,11 +11,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
-    // Retrieves the global user profile to check system roles
     function getGlobalRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
@@ -41,7 +23,6 @@ service cloud.firestore {
       return isSignedIn() && getGlobalRole() == role;
     }
 
-    // Checks if the user is present in the document's denormalized members map
     function isProjectMember(data) {
       return isSignedIn() && (
         isAdmin() || 
@@ -56,88 +37,50 @@ service cloud.firestore {
       );
     }
 
-    // Validates that the data matches the path for relational integrity
-    function matchesPath(field, pathId) {
-      return field == pathId;
-    }
-
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for the UserProfile entity. 
-     */
     match /users/{userId} {
       allow get, list: if isSignedIn();
-      allow create: if (isOwner(userId) || isAdmin() || hasGlobalRole('Project Manager')) && matchesPath(request.resource.data.id, userId);
+      allow create: if (isOwner(userId) || isAdmin());
       allow update: if (isOwner(userId) || isAdmin());
       allow delete: if isAdmin();
 
-      /**
-       * @description Private user notifications.
-       */
       match /notifications/{notificationId} {
         allow get, list: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) || isAdmin();
-        allow update, delete: if isExistingOwner(userId) || isAdmin();
+        allow update, delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /timeEntries/{entryId} {
+        allow get, list: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) || isAdmin();
+        allow update, delete: if isOwner(userId) || isAdmin();
       }
     }
 
-    /**
-     * @description Collaborative projects.
-     */
     match /projects/{projectId} {
       allow get, list: if isProjectMember(resource.data) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isProjectMember(resource.data) || isAdmin();
       allow delete: if isProjectOwner(resource.data) || isAdmin();
 
-      /**
-       * @description Tasks within a project.
-       */
       match /tasks/{taskId} {
         allow get, list: if isProjectMember(resource.data) || isAdmin();
-        allow create: if (isProjectMember(request.resource.data) || isAdmin()) && matchesPath(request.resource.data.projectId, projectId);
-        allow update: if (isProjectMember(resource.data) || isAdmin());
+        allow create: if (isProjectMember(request.resource.data) || isAdmin());
+        allow update: if isProjectMember(resource.data) || isAdmin();
         allow delete: if isProjectMember(resource.data) || isAdmin();
 
-        /**
-         * @description Subtasks of a task.
-         */
         match /subtasks/{subtaskId} {
           allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create: if (isProjectMember(request.resource.data) || isAdmin());
-          allow update: if isProjectMember(resource.data) || isAdmin();
-          allow delete: if isProjectMember(resource.data) || isAdmin();
+          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
         }
 
-        /**
-         * @description Comments on tasks.
-         */
         match /comments/{commentId} {
           allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create: if (isProjectMember(request.resource.data) || isAdmin());
-          allow update: if (isProjectMember(resource.data) || isAdmin());
-          allow delete: if (isProjectMember(resource.data) || isAdmin());
+          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
         }
 
-        /**
-         * @description File attachments for tasks.
-         */
         match /attachments/{attachmentId} {
           allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create: if (isProjectMember(request.resource.data) || isAdmin());
-          allow update: if isProjectMember(resource.data) || isAdmin();
-          allow delete: if (isProjectMember(resource.data) || isAdmin());
-        }
-
-        /**
-         * @description Time tracking entries.
-         */
-        match /timeEntries/{timeEntryId} {
-          allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create: if (isProjectMember(request.resource.data) || isAdmin());
-          allow update: if isProjectMember(resource.data) || isAdmin();
-          allow delete: if (isProjectMember(resource.data) || isAdmin());
+          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
         }
       }
     }
