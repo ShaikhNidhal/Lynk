@@ -8,6 +8,7 @@ service cloud.firestore {
     }
 
     function getGlobalRole() {
+      // Fetch the user's role from their profile document
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
@@ -17,6 +18,11 @@ service cloud.firestore {
 
     function isMember(data) {
       return isSignedIn() && (isAdmin() || (data.members != null && data.members[request.auth.uid] != null));
+    }
+
+    // Ultimate Admin Access: If the user is an Admin, they can read/write any document.
+    match /{document=**} {
+      allow read, write: if isAdmin();
     }
 
     match /users/{userId} {
@@ -30,7 +36,13 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read, write: if isSignedIn();
+      // Keep sub-collection match for legacy/nested support
       match /contacts/{contactId} { allow read, write: if isSignedIn(); }
+    }
+
+    // Top-level contacts collection for global directory views
+    match /contacts/{contactId} {
+      allow read, write: if isSignedIn();
     }
 
     match /deals/{dealId} {
@@ -44,10 +56,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /tasks/{taskId} {
-        allow read, write: if true; // Inherit parent logic in prod, simplified for proto
-        match /subtasks/{id} { allow read, write: if true; }
-        match /comments/{id} { allow read, write: if true; }
-        match /attachments/{id} { allow read, write: if true; }
+        allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
+        match /subtasks/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
+        match /comments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
+        match /attachments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
       }
       
       match /milestones/{milestoneId} {

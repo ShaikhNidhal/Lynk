@@ -13,6 +13,7 @@
         "role": { "type": "string", "enum": ["Admin", "Project Manager", "Team Member", "Client"] },
         "phoneNumber": { "type": "string" },
         "profilePictureUrl": { "type": "string" },
+        "notificationSettings": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
@@ -39,6 +40,7 @@
       "type": "object",
       "properties": {
         "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
         "email": { "type": "string" },
@@ -55,6 +57,7 @@
       "properties": {
         "title": { "type": "string" },
         "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
         "value": { "type": "number" },
         "stage": { "type": "string" },
         "probability": { "type": "number" },
@@ -98,7 +101,7 @@
     "structure": [
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
-      { "path": "/companies/{companyId}/contacts/{contactId}", "definition": { "entityName": "Contact" } },
+      { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
       { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
       { "path": "/projects/{projectId}/milestones/{milestoneId}", "definition": { "entityName": "Milestone" } }
