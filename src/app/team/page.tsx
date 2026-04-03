@@ -11,6 +11,7 @@ import { collection, query, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
+import { MemberDetailsDialog } from "@/components/team/member-details-dialog";
 
 export default function TeamPage() {
   const { user } = useUser();
@@ -101,9 +102,7 @@ export default function TeamPage() {
                     <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest italic">
                       Since {member.createdAt?.seconds ? new Date(member.createdAt.seconds * 1000).getFullYear() : '2024'}
                     </div>
-                    <Button variant="ghost" size="sm" className="text-[10px] h-7 font-bold uppercase tracking-wider hover:text-primary hover:bg-primary/5">
-                      View Profile
-                    </Button>
+                    <MemberDetailsDialog memberId={member.id} />
                   </div>
                 </CardContent>
               </Card>
