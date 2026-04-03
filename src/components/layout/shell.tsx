@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -15,8 +15,12 @@ import {
   Plus,
   Clock,
   Loader2,
-  Terminal,
-  Handshake
+  Handshake,
+  Building2,
+  LineChart,
+  Briefcase,
+  ChevronDown,
+  Contact as ContactIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,34 +40,27 @@ import { signOut } from "firebase/auth";
 import { doc } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { 
+  Collapsible, 
+  CollapsibleContent, 
+  CollapsibleTrigger 
+} from "@/components/ui/collapsible";
 
 const LogoIcon = ({ className }: { className?: string }) => (
-  <svg 
-    viewBox="0 0 32 32" 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg" 
-    className={cn("w-full h-full", className)}
-  >
+  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className={cn("w-full h-full", className)}>
     <rect x="3" y="3" width="26" height="26" rx="2" stroke="currentColor" strokeWidth="3.5" />
     <path d="M10 11L16 16L10 21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
     <line x1="18" y1="21" x2="24" y2="21" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
   </svg>
 );
 
-const Logo = ({ className }: { className?: string }) => (
-  <div className={cn("flex items-center gap-2", className)}>
-    <div className="w-8 h-8 flex items-center justify-center text-primary">
-      <LogoIcon />
-    </div>
-    <span className="text-xl font-bold tracking-tight text-foreground">Lynk</span>
-  </div>
-);
-
 const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (open: boolean) => void }) => {
   const { user } = useUser();
   const { firestore } = useFirebase();
   const router = useRouter();
+  const pathname = usePathname();
+  const [crmOpen, setCrmOpen] = useState(pathname.startsWith('/crm'));
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -85,17 +82,38 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 mb-4">
-        <Link href="/dashboard" onClick={onItemClick} className={cn("flex items-center gap-2 transition-all", !open && "opacity-0 invisible w-0 lg:opacity-100 lg:visible lg:w-auto")}>
-          <Logo />
+        <Link href="/dashboard" onClick={onItemClick} className={cn("flex items-center gap-2", !open && "lg:justify-center")}>
+          <div className="w-8 h-8 text-primary shrink-0"><LogoIcon /></div>
+          {open && <span className="text-xl font-bold tracking-tight text-foreground">SprintFlow</span>}
         </Link>
       </div>
       
-      <nav className="flex-1 px-2 space-y-1">
+      <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
         <NavItem icon={<LayoutDashboard />} label="Dashboard" href="/dashboard" open={open} onClick={onItemClick} />
+        
+        {/* CRM Section */}
+        <Collapsible open={crmOpen && open} onOpenChange={setCrmOpen} className="w-full">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
+              <div className="flex items-center gap-3">
+                <LineChart className="w-5 h-5" />
+                {open && <span className="font-semibold">CRM Hub</span>}
+              </div>
+              {open && <ChevronDown className={cn("w-4 h-4 transition-transform", crmOpen && "rotate-180")} />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 mt-1 pl-4">
+            <NavItem icon={<Briefcase />} label="Pipelines" href="/crm/pipeline" open={open} onClick={onItemClick} sub />
+            <NavItem icon={<Building2 />} label="Companies" href="/crm/companies" open={open} onClick={onItemClick} sub />
+            <NavItem icon={<ContactIcon />} label="Contacts" href="/crm/contacts" open={open} onClick={onItemClick} sub />
+          </CollapsibleContent>
+        </Collapsible>
+
         <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
         <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
-        <NavItem icon={<Handshake />} label="Clients" href="/clients" open={open} onClick={onItemClick} />
+        <NavItem icon={<Handshake />} label="Client Portal" href="/clients" open={open} onClick={onItemClick} />
         <NavItem icon={<Users />} label="Team" href="/team" open={open} onClick={onItemClick} />
+        
         <div className="pt-4 mt-4 border-t border-border">
           <NavItem icon={<Settings />} label="Settings" href="/settings" open={open} onClick={onItemClick} />
         </div>
@@ -106,12 +124,12 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
           <DropdownMenuTrigger asChild>
             <button className={cn("flex items-center gap-3 w-full hover:bg-secondary/50 p-2 rounded-lg transition-colors group", !open && "lg:justify-center")}>
               <Avatar className="w-8 h-8 border shadow-sm group-hover:border-primary/50 transition-colors">
-                <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/100/100`} />
-                <AvatarFallback>{profile?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                <AvatarImage src={profile?.profilePictureUrl || `https://picsum.photos/seed/${user?.uid}/100/100`} />
+                <AvatarFallback>{profile?.firstName?.[0] || "U"}</AvatarFallback>
               </Avatar>
-              {(open || setMobileOpen) && (
+              {open && (
                 <div className="flex flex-col overflow-hidden text-left">
-                  <span className="text-sm font-semibold truncate text-foreground">{profile?.firstName} {profile?.lastName}</span>
+                  <span className="text-sm font-semibold truncate text-foreground">{profile?.firstName || "User"}</span>
                   <span className="text-[10px] text-primary/80 truncate italic uppercase font-bold tracking-wider">{profile?.role || "Guest"}</span>
                 </div>
               )}
@@ -119,14 +137,10 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 glass-card">
             <DropdownMenuItem asChild>
-              <Link href="/settings" className="flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Profile Settings
-              </Link>
+              <Link href="/settings">Profile Settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -136,7 +150,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   );
 };
 
-const NavItem = ({ icon, label, href, open, onClick }: { icon: React.ReactNode, label: string, href: string, open: boolean, onClick?: () => void }) => {
+const NavItem = ({ icon, label, href, open, onClick, sub }: { icon: React.ReactNode, label: string, href: string, open: boolean, onClick?: () => void, sub?: boolean }) => {
   const pathname = usePathname();
   const active = pathname === href;
   
@@ -147,14 +161,15 @@ const NavItem = ({ icon, label, href, open, onClick }: { icon: React.ReactNode, 
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
         active 
-          ? "bg-primary text-white shadow-md shadow-primary/20" 
-          : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
+          ? "bg-primary text-white shadow-md" 
+          : "text-muted-foreground hover:bg-primary/5 hover:text-primary",
+        sub && "py-1.5"
       )}
     >
       <div className={cn("shrink-0 transition-all", active ? "text-white" : "text-muted-foreground group-hover:text-primary")}>
-        {React.cloneElement(icon as React.ReactElement, { className: "w-5 h-5" })}
+        {React.cloneElement(icon as React.ReactElement, { className: sub ? "w-4 h-4" : "w-5 h-5" })}
       </div>
-      {(open || onClick) && <span className="font-semibold whitespace-nowrap">{label}</span>}
+      {open && <span className={cn("font-semibold whitespace-nowrap", sub ? "text-xs" : "text-sm")}>{label}</span>}
       {active && open && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
     </Link>
   );
@@ -162,29 +177,19 @@ const NavItem = ({ icon, label, href, open, onClick }: { icon: React.ReactNode, 
 
 const TopNav = ({ onMenuClick }: { onMenuClick: () => void }) => {
   return (
-    <header className="h-16 border-b bg-card/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+    <header className="h-16 border-b bg-card/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center flex-1 max-w-md gap-4">
         <Button variant="ghost" size="icon" onClick={onMenuClick} className="lg:hidden">
           <Menu className="w-5 h-5" />
         </Button>
         <div className="relative w-full hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search tasks, projects..." 
-            className="pl-9 bg-background border-none focus-visible:ring-primary shadow-inner" 
-          />
+          <Input placeholder="Search global..." className="pl-9 bg-background border-none shadow-inner" />
         </div>
       </div>
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-3">
         <NotificationBell />
-        <CreateProjectDialog 
-          trigger={
-            <Button size="sm" className="gap-2 shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4" />
-              <span className="hidden xs:inline">New Project</span>
-            </Button>
-          }
-        />
+        <CreateProjectDialog trigger={<Button size="sm" className="gap-2 shadow-lg bg-primary"><Plus className="w-4 h-4" /><span className="hidden xs:inline">New Project</span></Button>} />
       </div>
     </header>
   );
@@ -196,46 +201,21 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
-  if (isUserLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    router.push("/login");
-    return null;
-  }
+  if (isUserLoading) return <div className="h-screen w-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (!user) { router.push("/login"); return null; }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar */}
-      <aside className={cn(
-        "hidden lg:flex bg-card border-r transition-all duration-300 flex-col z-20 shadow-sm",
-        sidebarOpen ? "w-64" : "w-20"
-      )}>
+      <aside className={cn("hidden lg:flex bg-card border-r transition-all duration-300 flex-col z-20", sidebarOpen ? "w-64" : "w-20")}>
         <div className="p-4 flex items-center justify-end">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="hover:bg-primary/10 hover:text-primary">
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}</Button>
         </div>
         <NavContent open={sidebarOpen} />
       </aside>
-
-      {/* Mobile Drawer */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="p-0 w-72">
-          <NavContent open={true} setMobileOpen={setMobileOpen} />
-        </SheetContent>
-      </Sheet>
-
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="left" className="p-0 w-72"><NavContent open={true} setMobileOpen={setMobileOpen} /></SheetContent></Sheet>
       <main className="flex-1 flex flex-col overflow-hidden">
         <TopNav onMenuClick={() => setMobileOpen(true)} />
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth bg-background">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">{children}</div>
       </main>
     </div>
   );

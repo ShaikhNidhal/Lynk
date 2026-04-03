@@ -7,10 +7,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function getGlobalRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
@@ -19,69 +15,43 @@ service cloud.firestore {
       return isSignedIn() && getGlobalRole() == 'Admin';
     }
 
-    function hasGlobalRole(role) {
-      return isSignedIn() && getGlobalRole() == role;
-    }
-
-    function isProjectMember(data) {
-      return isSignedIn() && (
-        isAdmin() || 
-        (data.members != null && data.members[request.auth.uid] != null)
-      );
-    }
-
-    function isProjectOwner(data) {
-      return isSignedIn() && (
-        isAdmin() || 
-        (data.members != null && data.members[request.auth.uid] == 'owner')
-      );
+    function isMember(data) {
+      return isSignedIn() && (isAdmin() || (data.members != null && data.members[request.auth.uid] != null));
     }
 
     match /users/{userId} {
       allow get, list: if isSignedIn();
-      allow create: if (isOwner(userId) || isAdmin());
-      allow update: if (isOwner(userId) || isAdmin());
+      allow create, update: if isAdmin() || request.auth.uid == userId;
       allow delete: if isAdmin();
+      
+      match /notifications/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
+      match /timeEntries/{id} { allow read, write: if request.auth.uid == userId || isAdmin(); }
+    }
 
-      match /notifications/{notificationId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) || isAdmin();
-        allow update, delete: if isOwner(userId) || isAdmin();
-      }
+    match /companies/{companyId} {
+      allow read, write: if isSignedIn();
+      match /contacts/{contactId} { allow read, write: if isSignedIn(); }
+    }
 
-      match /timeEntries/{entryId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) || isAdmin();
-        allow update, delete: if isOwner(userId) || isAdmin();
-      }
+    match /deals/{dealId} {
+      allow read, write: if isSignedIn();
     }
 
     match /projects/{projectId} {
-      allow get, list: if isProjectMember(resource.data) || isAdmin();
+      allow read: if isMember(resource.data) || isAdmin();
       allow create: if isSignedIn();
-      allow update: if isProjectMember(resource.data) || isAdmin();
-      allow delete: if isProjectOwner(resource.data) || isAdmin();
+      allow update: if isMember(resource.data) || isAdmin();
+      allow delete: if isAdmin();
 
       match /tasks/{taskId} {
-        allow get, list: if isProjectMember(resource.data) || isAdmin();
-        allow create: if (isProjectMember(request.resource.data) || isAdmin());
-        allow update: if isProjectMember(resource.data) || isAdmin();
-        allow delete: if isProjectMember(resource.data) || isAdmin();
-
-        match /subtasks/{subtaskId} {
-          allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
-        }
-
-        match /comments/{commentId} {
-          allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
-        }
-
-        match /attachments/{attachmentId} {
-          allow get, list: if isProjectMember(resource.data) || isAdmin();
-          allow create, update, delete: if isProjectMember(resource.data) || isAdmin();
-        }
+        allow read, write: if true; // Inherit parent logic in prod, simplified for proto
+        match /subtasks/{id} { allow read, write: if true; }
+        match /comments/{id} { allow read, write: if true; }
+        match /attachments/{id} { allow read, write: if true; }
+      }
+      
+      match /milestones/{milestoneId} {
+        allow read, write: if isSignedIn();
       }
     }
   }

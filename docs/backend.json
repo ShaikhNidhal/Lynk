@@ -2,128 +2,106 @@
 {
   "entities": {
     "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Represents a user's profile within the SprintFlow application, including their assigned role and personal details. Authentication and core user management (e.g., password storage) are handled by an external system (Firebase Authentication).",
+      "description": "User account and role data.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile entity. This typically corresponds to the Firebase Authentication User ID (UID)."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The user's first name."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The user's last name."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address, used for communication and identification within the app (not for authentication credentials, which are managed externally by Firebase Auth).",
-          "format": "email"
-        },
-        "phoneNumber": {
-          "type": "string",
-          "description": "The user's contact phone number."
-        },
-        "role": {
-          "type": "string",
-          "description": "The assigned role for the user, defining their access permissions within the application. Possible values include 'Admin', 'Project Manager', 'Team Member', 'Client'."
-        },
-        "profilePictureUrl": {
-          "type": "string",
-          "description": "An optional URL to the user's profile picture.",
-          "format": "uri"
-        },
-        "notificationSettings": {
-          "type": "object",
-          "description": "User's notification preferences.",
-          "properties": {
-            "emailSummaries": { "type": "boolean" },
-            "inAppAlerts": { "type": "boolean" },
-            "securityAlerts": { "type": "boolean" }
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user profile was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user profile was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "firstName",
-        "lastName",
-        "email",
-        "role",
-        "createdAt",
-        "updatedAt"
-      ]
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Admin", "Project Manager", "Team Member", "Client"] },
+        "phoneNumber": { "type": "string" },
+        "profilePictureUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     },
-    "TimeEntry": {
-      "title": "TimeEntry",
-      "description": "A record of time spent on a specific project or task.",
+    "Company": {
+      "title": "Company",
+      "description": "Represents a client organization or partner.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "taskId": { "type": "string" },
-        "taskTitle": { "type": "string" },
-        "startTime": { "type": "string", "format": "date-time" },
-        "endTime": { "type": "string", "format": "date-time" },
-        "duration": { "type": "number", "description": "Duration in seconds" },
-        "description": { "type": "string" },
+        "name": { "type": "string" },
+        "industry": { "type": "string" },
+        "website": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Lead", "Inactive"] },
+        "healthScore": { "type": "number" },
+        "address": { "type": "string" },
+        "billingInfo": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "projectId", "duration", "createdAt"]
+      "required": ["name", "status"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "An individual associated with a Company.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "isPrimary": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "A sales opportunity in the pipeline.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "companyId": { "type": "string" },
+        "value": { "type": "number" },
+        "stage": { "type": "string" },
+        "probability": { "type": "number" },
+        "expectedCloseDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Won", "Lost"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Project": {
+      "title": "Project",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "companyId": { "type": "string" },
+        "dealId": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "type": { "type": "string" },
+        "budget": { "type": "number" },
+        "members": { "type": "object" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "A major phase or goal within a project.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Pending", "Completed", "Overdue"] },
+        "color": { "type": "string" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores individual user profiles."
-        }
-      },
-      {
-        "path": "/users/{userId}/timeEntries/{entryId}",
-        "definition": {
-          "entityName": "TimeEntry",
-          "schema": {
-            "$ref": "#/backend/entities/TimeEntry"
-          },
-          "description": "User-specific time logs for global tracking views."
-        }
-      },
-      {
-        "path": "/projects/{projectId}",
-        "definition": {
-          "entityName": "Project",
-          "schema": {
-            "$ref": "#/backend/entities/Project"
-          },
-          "description": "Top-level collection for collaborative projects."
-        }
-      }
+      { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
+      { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
+      { "path": "/companies/{companyId}/contacts/{contactId}", "definition": { "entityName": "Contact" } },
+      { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
+      { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
+      { "path": "/projects/{projectId}/milestones/{milestoneId}", "definition": { "entityName": "Milestone" } }
     ]
   }
 }
