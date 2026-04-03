@@ -37,21 +37,30 @@ export default function DashboardPage() {
   const { user } = useUser();
   const { firestore } = useFirebase();
 
-  // 1. Fetch User Profile
+  // 1. Fetch User Profile for Role Check
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
   }, [firestore, user?.uid]);
   const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  // 2. Fetch User's Projects
+  // 2. Fetch User's Projects - Admin sees ALL live projects
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !user?.uid || isProfileLoading || !profile) return null;
+    
+    const projectsRef = collection(firestore, "projects");
+    
+    // Admins have ultimate access to all live projects
+    if (profile.role === 'Admin') {
+      return query(projectsRef);
+    }
+    
+    // Regular members see only their assigned projects
     return query(
-      collection(firestore, "projects"),
+      projectsRef,
       where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, user?.uid, profile, isProfileLoading]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
   // 3. Fetch Team Members for Real-time Status
@@ -66,11 +75,11 @@ export default function DashboardPage() {
     return allUsers.filter(u => u.role !== "Client");
   }, [allUsers]);
 
-  // Mocked workload data based on actual team members
+  // Mocked workload data based on actual team members for visualization demo
   const workloadData = useMemo(() => {
     return teamMembers.slice(0, 5).map((member, idx) => ({
       name: member.firstName || "Member",
-      tasks: [8, 12, 5, 9, 15][idx % 5], // Deterministic mock values
+      tasks: [8, 12, 5, 9, 15][idx % 5], 
       capacity: 10,
       availability: [8, 12, 5, 9, 15][idx % 5] > 10 ? "Overloaded" : "Available"
     }));
@@ -100,7 +109,7 @@ export default function DashboardPage() {
               Welcome back, {profile?.firstName || "User"}!
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Overview of your resources.
+              Role: <span className="font-semibold text-primary">{profile?.role || "Not Assigned"}</span> • Overview of live workspace resources.
             </p>
           </div>
           <div className="flex gap-2">
@@ -118,7 +127,7 @@ export default function DashboardPage() {
           <StatCard 
             title="Assigned Projects" 
             value={activeProjectsCount.toString()} 
-            description="Active workspaces" 
+            description={profile?.role === 'Admin' ? "Total organizational boards" : "Your active workspaces"} 
             icon={<Briefcase className="text-primary" />} 
           />
           <StatCard 
@@ -130,13 +139,13 @@ export default function DashboardPage() {
           <StatCard 
             title="Milestones Met" 
             value="24" 
-            description="This sprint" 
+            description="Current simulation" 
             icon={<CheckCircle2 className="text-green-500" />} 
           />
           <StatCard 
             title="Utilization Alert" 
             value="2" 
-            description="Members overloaded" 
+            description="Capacity warnings" 
             icon={<AlertCircle className="text-destructive" />} 
           />
         </div>
@@ -234,7 +243,7 @@ export default function DashboardPage() {
           <Card className="md:col-span-7 glass-card border-accent/10">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Active Projects</CardTitle>
+                <CardTitle className="text-lg">Live Active Projects</CardTitle>
                 <CardDescription className="text-xs">Quick access to assigned boards</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
@@ -258,7 +267,7 @@ export default function DashboardPage() {
                         <h4 className="font-bold text-xs truncate group-hover:text-primary transition-colors">{project.name}</h4>
                         <div className="mt-4 space-y-2">
                            <div className="flex justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">
-                             <span>Health</span>
+                             <span>Status</span>
                              <span className="text-green-600">{project.status}</span>
                            </div>
                            <Progress value={65} className="h-1" />
@@ -270,7 +279,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="py-12 text-center bg-secondary/20 rounded-xl border-2 border-dashed">
                   <Briefcase className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground font-medium">No projects assigned yet.</p>
+                  <p className="text-sm text-muted-foreground font-medium">No projects found in this live view.</p>
                   <Button variant="link" asChild className="mt-2 text-xs">
                     <Link href="/projects">Create your first project</Link>
                   </Button>
