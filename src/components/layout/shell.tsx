@@ -43,7 +43,7 @@ import { signOut } from "firebase/auth";
 import { doc } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { 
   Collapsible, 
   CollapsibleContent, 
@@ -248,7 +248,15 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
         </div>
         <NavContent open={sidebarOpen} />
       </aside>
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetContent side="left" className="p-0 w-72"><NavContent open={true} setMobileOpen={setMobileOpen} /></SheetContent></Sheet>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="p-0 w-72">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation Menu</SheetTitle>
+            <SheetDescription>Access your dashboard, projects, and organizational analytics.</SheetDescription>
+          </SheetHeader>
+          <NavContent open={true} setMobileOpen={setMobileOpen} />
+        </SheetContent>
+      </Sheet>
       <main className="flex-1 flex flex-col overflow-hidden">
         <TopNav onMenuClick={() => setMobileOpen(true)} />
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">{children}</div>
