@@ -32,24 +32,39 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
-  // 1. Fetch Project Details
+  // 1. Fetch User Profile for Admin check
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user?.uid]);
+  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  // 2. Fetch Project Details
   const projectRef = useMemoFirebase(() => {
     if (!firestore || !projectId) return null;
     return doc(firestore, "projects", projectId);
   }, [firestore, projectId]);
   const { data: project, isLoading: isProjectLoading } = useDoc(projectRef);
 
-  // 2. Fetch Tasks with QAP filter
+  // 3. Fetch Tasks - if Admin, show all in project. Otherwise, filter by membership.
   const tasksQuery = useMemoFirebase(() => {
-    if (!firestore || !projectId || !user?.uid) return null;
+    if (!firestore || !projectId || !user?.uid || isProfileLoading || !profile) return null;
+    
+    const tasksRef = collection(firestore, "projects", projectId, "tasks");
+    
+    if (profile.role === 'Admin') {
+      return query(tasksRef);
+    }
+    
     return query(
-      collection(firestore, "projects", projectId, "tasks"),
+      tasksRef,
       where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, projectId, user?.uid]);
+  }, [firestore, projectId, user?.uid, profile, isProfileLoading]);
+  
   const { data: rawTasks, isLoading: isTasksLoading } = useCollection(tasksQuery);
 
-  // 3. Client-side sorting and column organization
+  // 4. Client-side sorting and column organization
   const columns = useMemo(() => {
     const defaultCols = [
       { id: "todo", title: "To Do", tasks: [] as any[] },
@@ -103,7 +118,9 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
     });
   };
 
-  if (isProjectLoading) {
+  const isLoading = isProjectLoading || isProfileLoading;
+
+  if (isLoading) {
     return (
       <AppShell>
         <div className="flex items-center justify-center h-[50vh]">
@@ -135,7 +152,10 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
                {project.name?.[0]?.toUpperCase() || "P"}
              </div>
              <div>
-               <h1 className="text-2xl font-bold tracking-tight text-foreground">{project.name}</h1>
+               <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                 {project.name}
+                 {profile?.role === 'Admin' && <Badge variant="secondary" className="text-[9px] uppercase tracking-tighter h-4">Admin Access</Badge>}
+               </h1>
                <p className="text-sm text-muted-foreground flex items-center gap-2">
                  {project.type} Board • <span className="text-green-600 font-medium">{project.status}</span>
                </p>

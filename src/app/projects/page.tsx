@@ -9,8 +9,8 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
-import { useUser, useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { useUser, useFirebase, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, where, doc } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -20,19 +20,34 @@ export default function ProjectsPage() {
   const { firestore } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const projectsQuery = useMemoFirebase(() => {
+  // 1. Fetch User Profile to check for Admin status
+  const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
-    // Query projects where the user is a member (the members map contains their UID)
-    // We only use the existence check filter to satisfy security rules (QAP).
-    // Note: We avoid compound orderBy with dynamic keys as it's impossible to index at scale.
-    // Sorting will be handled on the client side.
+    return doc(firestore, "users", user.uid);
+  }, [firestore, user?.uid]);
+  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  // 2. Fetch projects - if Admin, show all. Otherwise, filter by membership.
+  const projectsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid || isProfileLoading || !profile) return null;
+    
+    const projectsRef = collection(firestore, "projects");
+    
+    // Admins see everything
+    if (profile.role === 'Admin') {
+      return query(projectsRef);
+    }
+    
+    // Regular users see only their projects (QAP)
     return query(
-      collection(firestore, "projects"),
+      projectsRef,
       where(`members.${user.uid}`, "!=", null)
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, user?.uid, profile, isProfileLoading]);
 
-  const { data: projects, isLoading } = useCollection(projectsQuery);
+  const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
+
+  const isLoading = isProfileLoading || isProjectsLoading;
 
   // Client-side sorting and filtering
   const processedProjects = useMemo(() => {
@@ -40,8 +55,8 @@ export default function ProjectsPage() {
     
     // 1. Filter by search term
     const filtered = projects.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.description.toLowerCase().includes(searchTerm.toLowerCase())
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      p.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // 2. Sort by createdAt (descending)
@@ -57,7 +72,12 @@ export default function ProjectsPage() {
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              Projects
+              {profile?.role === 'Admin' && (
+                <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">Admin View</Badge>
+              )}
+            </h1>
             <p className="text-muted-foreground mt-1">Manage your team's agile and kanban workflows.</p>
           </div>
           <CreateProjectDialog />
@@ -82,7 +102,7 @@ export default function ProjectsPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <p className="text-muted-foreground font-medium">Loading your projects...</p>
+            <p className="text-muted-foreground font-medium">Loading projects...</p>
           </div>
         ) : processedProjects && processedProjects.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -91,7 +111,7 @@ export default function ProjectsPage() {
                 <div className="relative h-48 w-full overflow-hidden bg-secondary/20">
                   <Image 
                     src={`https://picsum.photos/seed/${project.id}/600/400`} 
-                    alt={project.name}
+                    alt={project.name || "Project"}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                     data-ai-hint="project dashboard"
