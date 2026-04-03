@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser, useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
@@ -27,7 +27,9 @@ import {
   Handshake,
   Check,
   Phone,
-  Image as ImageIcon
+  Camera,
+  Upload,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +37,7 @@ export default function SettingsPage() {
   const { user } = useUser();
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -80,6 +83,42 @@ export default function SettingsPage() {
       title: "Profile Updated",
       description: "Your changes have been saved successfully.",
     });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check file size (Firestore doc limit is 1MB, Base64 adds ~33% overhead)
+      if (file.size > 500 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 500KB for synchronization.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData(prev => ({ ...prev, profilePictureUrl: base64String }));
+        toast({
+          title: "Photo Uploaded",
+          description: "Click 'Save Changes' to apply this update to your profile.",
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   if (isLoading) {
@@ -130,25 +169,59 @@ export default function SettingsPage() {
                   <CardDescription>Update your public profile details and contact information.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-border/50">
-                    <Avatar className="w-20 h-20 border-4 border-white shadow-md">
-                      <AvatarImage src={formData.profilePictureUrl || `https://picsum.photos/seed/${user?.uid}/200/200`} />
-                      <AvatarFallback className="text-2xl font-bold bg-primary text-white">
-                        {formData.firstName?.[0]}{formData.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-2 text-center sm:text-left flex-1">
-                      <Label htmlFor="profilePictureUrl" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                        <ImageIcon className="w-3 h-3" /> Profile Picture URL
-                      </Label>
-                      <Input 
-                        id="profilePictureUrl" 
-                        placeholder="https://example.com/photo.jpg" 
-                        value={formData.profilePictureUrl}
-                        onChange={(e) => setFormData({...formData, profilePictureUrl: e.target.value})}
-                        className="h-8 text-xs"
+                  <div className="flex flex-col sm:flex-row items-center gap-8 pb-8 border-b border-border/50">
+                    <div 
+                      className="relative group cursor-pointer" 
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Avatar className="w-24 h-24 border-4 border-white shadow-xl group-hover:opacity-80 transition-all ring-2 ring-primary/5">
+                        <AvatarImage src={formData.profilePictureUrl || `https://picsum.photos/seed/${user?.uid}/200/200`} className="object-cover" />
+                        <AvatarFallback className="text-2xl font-bold bg-primary text-white">
+                          {formData.firstName?.[0]}{formData.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-full">
+                        <Camera className="w-8 h-8 text-white" />
+                      </div>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleFileChange} 
                       />
-                      <p className="text-[10px] text-muted-foreground italic">Paste a link to your avatar image</p>
+                    </div>
+                    
+                    <div className="space-y-2 text-center sm:text-left flex-1">
+                      <h3 className="text-lg font-bold">Profile Photo</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
+                        Click the avatar to upload a new image from your device. <br/>
+                        Allowed formats: JPG, PNG. Max size 500KB.
+                      </p>
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="h-8 text-[10px] uppercase font-bold tracking-widest gap-2"
+                        >
+                          <Upload className="w-3 h-3" />
+                          Upload Photo
+                        </Button>
+                        {formData.profilePictureUrl && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setFormData(p => ({...p, profilePictureUrl: ""}))}
+                            className="h-8 text-[10px] uppercase font-bold tracking-widest text-destructive hover:bg-destructive/5"
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -198,7 +271,7 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="bg-secondary/5 pt-6 flex justify-end">
-                  <Button type="submit" className="gap-2 font-bold uppercase tracking-widest text-xs h-10 px-8">
+                  <Button type="submit" className="gap-2 font-bold uppercase tracking-widest text-xs h-10 px-8 shadow-md">
                     Save Changes
                   </Button>
                 </CardFooter>
