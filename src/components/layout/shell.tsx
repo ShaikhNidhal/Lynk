@@ -20,6 +20,9 @@ import {
   LineChart,
   Briefcase,
   ChevronDown,
+  Target,
+  Zap,
+  BarChart2,
   Contact as ContactIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,6 +64,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   const router = useRouter();
   const pathname = usePathname();
   const [crmOpen, setCrmOpen] = useState(pathname.startsWith('/crm'));
+  const [analyticsOpen, setAnalyticsOpen] = useState(pathname.includes('dashboard') || pathname.includes('workload'));
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -103,6 +107,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-1 mt-1 pl-4">
+            <NavItem icon={<Target />} label="Revenue Dash" href="/crm/dashboard" open={open} onClick={onItemClick} sub />
             <NavItem icon={<Briefcase />} label="Pipelines" href="/crm/pipeline" open={open} onClick={onItemClick} sub />
             <NavItem icon={<Building2 />} label="Companies" href="/crm/companies" open={open} onClick={onItemClick} sub />
             <NavItem icon={<ContactIcon />} label="Contacts" href="/crm/contacts" open={open} onClick={onItemClick} sub />
@@ -111,8 +116,24 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
 
         <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
         <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
+        
+        <Collapsible open={analyticsOpen && open} onOpenChange={setAnalyticsOpen} className="w-full">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
+              <div className="flex items-center gap-3">
+                <BarChart2 className="w-5 h-5" />
+                {open && <span className="font-semibold">Analytics</span>}
+              </div>
+              {open && <ChevronDown className={cn("w-4 h-4 transition-transform", analyticsOpen && "rotate-180")} />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 mt-1 pl-4">
+            <NavItem icon={<Zap />} label="Team Workload" href="/team/workload" open={open} onClick={onItemClick} sub />
+            <NavItem icon={<Users />} label="Directory" href="/team" open={open} onClick={onItemClick} sub />
+          </CollapsibleContent>
+        </Collapsible>
+
         <NavItem icon={<Handshake />} label="Client Portal" href="/clients" open={open} onClick={onItemClick} />
-        <NavItem icon={<Users />} label="Team" href="/team" open={open} onClick={onItemClick} />
         
         <div className="pt-4 mt-4 border-t border-border">
           <NavItem icon={<Settings />} label="Settings" href="/settings" open={open} onClick={onItemClick} />
@@ -176,16 +197,31 @@ const NavItem = ({ icon, label, href, open, onClick, sub }: { icon: React.ReactN
 };
 
 const TopNav = ({ onMenuClick }: { onMenuClick: () => void }) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
   return (
     <header className="h-16 border-b bg-card/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center flex-1 max-w-md gap-4">
         <Button variant="ghost" size="icon" onClick={onMenuClick} className="lg:hidden">
           <Menu className="w-5 h-5" />
         </Button>
-        <div className="relative w-full hidden sm:block">
+        <form onSubmit={handleSearch} className="relative w-full hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search global..." className="pl-9 bg-background border-none shadow-inner" />
-        </div>
+          <Input 
+            placeholder="Search organizational vault..." 
+            className="pl-9 bg-background border-none shadow-inner" 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </form>
       </div>
       <div className="flex items-center gap-3">
         <NotificationBell />
