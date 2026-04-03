@@ -15,7 +15,8 @@ import {
   Briefcase,
   Zap,
   Calendar,
-  Search
+  Search,
+  Plus
 } from "lucide-react";
 import { 
   BarChart, 
@@ -35,6 +36,7 @@ import { useUser, useDoc, useFirebase, useMemoFirebase, useCollection } from "@/
 import { doc, collection, query, where, limit, orderBy } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { user } = useUser();

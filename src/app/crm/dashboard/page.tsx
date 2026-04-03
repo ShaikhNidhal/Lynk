@@ -7,17 +7,13 @@ import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { useMemo } from "react";
 import { 
-  LineChart, 
   BarChart, 
   Bar, 
   XAxis, 
   YAxis, 
   Tooltip, 
   ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell,
-  Legend
+  CartesianGrid
 } from "recharts";
 import { 
   DollarSign, 
@@ -32,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export default function CRMDashboard() {
   const { firestore } = useFirebase();
