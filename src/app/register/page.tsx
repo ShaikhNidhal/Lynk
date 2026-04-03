@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState } from "react";
 import { useFirebase } from "@/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, serverTimestamp, collection } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -53,7 +52,14 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // 2. Create Workspace
+      // 2. Send Verification Email (Production Requirement)
+      await sendEmailVerification(user);
+      toast({
+        title: "Verification Sent",
+        description: "Please check your inbox to verify your email address.",
+      });
+
+      // 3. Create Workspace
       const workspaceRef = doc(collection(firestore, "workspaces"));
       const workspaceId = workspaceRef.id;
       
@@ -67,7 +73,7 @@ export default function RegisterPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 3. Create User Profile with currentWorkspaceId
+      // 4. Create User Profile with currentWorkspaceId
       const userRef = doc(firestore, "users", user.uid);
       setDocumentNonBlocking(userRef, {
         id: user.uid,
@@ -80,7 +86,7 @@ export default function RegisterPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 4. Create Workspace Membership (Nested sub-collection)
+      // 5. Create Workspace Membership
       const memberRef = doc(firestore, "workspaces", workspaceId, "members", user.uid);
       setDocumentNonBlocking(memberRef, {
         id: user.uid,

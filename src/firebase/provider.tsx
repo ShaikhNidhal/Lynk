@@ -3,7 +3,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, onSnapshot } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -80,14 +80,21 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     const unsubscribeAuth = onAuthStateChanged(
       auth,
-      (firebaseUser) => {
+      async (firebaseUser) => {
         if (firebaseUser) {
-          // If logged in, also listen to profile
+          // Fetch custom claims to resolve role without Firestore read where possible
+          const tokenResult = await getIdTokenResult(firebaseUser);
+          const claimsRole = tokenResult.claims.role;
+
+          // If logged in, also listen to profile for dynamic updates (like name changes)
           const userDocRef = doc(firestore, "users", firebaseUser.uid);
           const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+            const profileData = docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } : null;
+            
             setUserAuthState({
               user: firebaseUser,
-              profile: docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } : null,
+              // Prioritize claims role for security, fallback to Firestore for metadata
+              profile: profileData ? { ...profileData, role: claimsRole || profileData.role } : null,
               isUserLoading: false,
               userError: null,
             });
