@@ -1,7 +1,9 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
+import { PresenceTracker } from "@/components/realtime/presence-tracker";
 
 export const metadata: Metadata = {
   title: 'Lynk | Professional Agile Management',
@@ -22,6 +24,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background selection:bg-primary/20" suppressHydrationWarning>
         <FirebaseClientProvider>
+          <PresenceTracker />
           {children}
           <Toaster />
         </FirebaseClientProvider>

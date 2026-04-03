@@ -18,7 +18,7 @@
     "UserProfile": {
       "title": "UserProfile",
       "type": "object",
-      "description": "User account and role data.",
+      "description": "User account and role data with presence tracking.",
       "properties": {
         "id": { "type": "string" },
         "firstName": { "type": "string" },
@@ -28,6 +28,8 @@
         "phoneNumber": { "type": "string" },
         "profilePictureUrl": { "type": "string" },
         "timezone": { "type": "string" },
+        "presenceStatus": { "type": "string", "enum": ["online", "away", "busy", "offline"] },
+        "lastActive": { "type": "string", "format": "date-time" },
         "notificationSettings": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }

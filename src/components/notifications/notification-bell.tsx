@@ -1,6 +1,7 @@
+
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Bell, Check, Loader2, Info, AlertTriangle, Zap } from "lucide-react";
 import { 
   Popover, 
@@ -14,10 +15,13 @@ import { collection, query, orderBy, limit, doc, updateDoc, serverTimestamp } fr
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 export function NotificationBell() {
   const { user } = useUser();
   const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const lastProcessedId = useRef<string | null>(null);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -29,6 +33,26 @@ export function NotificationBell() {
   }, [firestore, user?.uid]);
 
   const { data: notifications, isLoading } = useCollection(notificationsQuery);
+
+  // Mimic 'notification:new' WebSocket event with real-time toasts
+  useEffect(() => {
+    if (!notifications || notifications.length === 0 || isLoading) return;
+    
+    const newest = notifications[0];
+    if (newest.id !== lastProcessedId.current && !newest.read) {
+      // Only toast if it's actually new (within the last 10 seconds to avoid stale toast storms)
+      const isRecent = newest.createdAt?.seconds && (Date.now() / 1000 - newest.createdAt.seconds) < 10;
+      
+      if (isRecent) {
+        toast({
+          title: newest.type === 'assignment' ? "New Assignment" : "System Update",
+          description: newest.message,
+          variant: newest.type === 'due_soon' ? "destructive" : "default",
+        });
+      }
+      lastProcessedId.current = newest.id;
+    }
+  }, [notifications, isLoading, toast]);
 
   const unreadCount = notifications?.filter(n => !n.read).length || 0;
 

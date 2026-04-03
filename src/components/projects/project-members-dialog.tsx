@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -28,6 +29,7 @@ import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface ProjectMembersDialogProps {
   projectId: string;
@@ -40,7 +42,6 @@ export function ProjectMembersDialog({ projectId, projectName, currentMembers }:
   const { firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
-  const [loading, setLoading] = useState(false);
 
   // Fetch users for search
   const usersQuery = useMemoFirebase(() => {
@@ -185,10 +186,15 @@ function MemberItem({ uid, role, isOwner, onRemove, onRoleChange }: {
   return (
     <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 border border-border">
       <div className="flex items-center gap-3">
-        <Avatar className="w-8 h-8">
-          <AvatarImage src={`https://picsum.photos/seed/${uid}/100/100`} />
-          <AvatarFallback>{profile?.firstName?.[0] || '?'}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="w-8 h-8">
+            <AvatarImage src={`https://picsum.photos/seed/${uid}/100/100`} />
+            <AvatarFallback>{profile?.firstName?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          {profile?.presenceStatus === 'online' && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+          )}
+        </div>
         <div className="flex flex-col">
           <span className="text-sm font-semibold">{profile?.firstName} {profile?.lastName}</span>
           <span className="text-[10px] text-muted-foreground">{profile?.email}</span>
