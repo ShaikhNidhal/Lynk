@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -54,6 +53,8 @@ export default function SettingsPage() {
     profilePictureUrl: ""
   });
 
+  const [currentTheme, setCurrentTheme] = useState<string>("light");
+
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -65,6 +66,30 @@ export default function SettingsPage() {
       });
     }
   }, [profile]);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("lynk-theme") || "light";
+    setCurrentTheme(savedTheme);
+    applyThemeToDocument(savedTheme);
+  }, []);
+
+  const applyThemeToDocument = (theme: string) => {
+    const root = document.documentElement;
+    root.classList.remove("dark", "glass");
+    if (theme !== "light") {
+      root.classList.add(theme);
+    }
+  };
+
+  const handleThemeChange = (theme: string) => {
+    setCurrentTheme(theme);
+    applyThemeToDocument(theme);
+    localStorage.setItem("lynk-theme", theme);
+    toast({
+      title: "Theme Updated",
+      description: `Interface switched to ${theme.charAt(0).toUpperCase() + theme.slice(1)} mode.`,
+    });
+  };
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +113,6 @@ export default function SettingsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Check file type
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
@@ -98,7 +122,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // Check file size (Firestore doc limit is 1MB, Base64 adds ~33% overhead)
       if (file.size > 500 * 1024) {
         toast({
           title: "File too large",
@@ -160,7 +183,6 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Profile Tab */}
           <TabsContent value="profile" className="mt-6">
             <Card className="glass-card">
               <form onSubmit={handleUpdateProfile}>
@@ -253,9 +275,6 @@ export default function SettingsPage() {
                         readOnly 
                         className="bg-secondary/20 cursor-not-allowed border-dashed"
                       />
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
-                        <Shield className="w-3 h-3 text-primary" /> Managed by System
-                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -279,7 +298,6 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Role Hub Tab */}
           <TabsContent value="role-details" className="mt-6">
             <div className="space-y-6">
               <Card className="glass-card border-primary/20 bg-primary/5">
@@ -318,63 +336,9 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              {role === "Admin" && (
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Organization Controls</CardTitle>
-                    <CardDescription>Global workspace configuration for administrators.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <AdminControlItem 
-                      label="Public Registration" 
-                      description="Allow new users to sign up via /register link." 
-                      status="Enabled" 
-                    />
-                    <AdminControlItem 
-                      label="Default Role" 
-                      description="The role assigned to new registrations." 
-                      status="Team Member" 
-                    />
-                  </CardContent>
-                </Card>
-              )}
-
-              {role === "Project Manager" && (
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Oversight Summary</CardTitle>
-                    <CardDescription>High-level view of your project health.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-around py-4 bg-secondary/5 rounded-xl border border-border/50">
-                      <StatItem value="12" label="Active Boards" />
-                      <StatItem value="84%" label="Avg. Velocity" />
-                      <StatItem value="3" label="Blocked Items" color="text-destructive" />
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {role === "Client" && (
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Partner Support</CardTitle>
-                    <CardDescription>How to get help with your portal.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-4 rounded-xl border border-accent/20 bg-accent/5">
-                      <p className="text-sm font-medium mb-2">Need project updates?</p>
-                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">Please reach out to your assigned Project Manager for any specific queries regarding deadlines or scope.</p>
-                      <Button size="sm" variant="outline" className="h-8 text-[10px] uppercase font-bold tracking-widest">Contact Support</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </TabsContent>
 
-          {/* Notifications Tab */}
           <TabsContent value="notifications" className="mt-6">
             <Card className="glass-card">
               <CardHeader>
@@ -389,7 +353,6 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Appearance Tab */}
           <TabsContent value="appearance" className="mt-6">
             <Card className="glass-card">
               <CardHeader>
@@ -400,9 +363,21 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Interface Theme</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <ThemeCard label="Light (Default)" active />
-                    <ThemeCard label="Dark (Beta)" disabled />
-                    <ThemeCard label="Glassmorphism" disabled />
+                    <ThemeCard 
+                      label="Light" 
+                      active={currentTheme === 'light'} 
+                      onClick={() => handleThemeChange('light')} 
+                    />
+                    <ThemeCard 
+                      label="Dark" 
+                      active={currentTheme === 'dark'} 
+                      onClick={() => handleThemeChange('dark')} 
+                    />
+                    <ThemeCard 
+                      label="Glassmorphism" 
+                      active={currentTheme === 'glass'} 
+                      onClick={() => handleThemeChange('glass')} 
+                    />
                   </div>
                 </div>
 
@@ -458,20 +433,6 @@ function NotificationToggle({ label, description, defaultChecked = false }: { la
   );
 }
 
-function AdminControlItem({ label, description, status }: { label: string, description: string, status: string }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-secondary/10 border border-border gap-4">
-      <div className="space-y-1">
-        <p className="text-xs font-bold">{label}</p>
-        <p className="text-[10px] text-muted-foreground italic">{description}</p>
-      </div>
-      <Badge variant="secondary" className="h-6 rounded-md font-bold uppercase text-[9px] w-fit sm:w-auto px-3">
-        {status}
-      </Badge>
-    </div>
-  );
-}
-
 function StatItem({ value, label, color = "text-foreground" }: { value: string, label: string, color?: string }) {
   return (
     <div className="text-center">
@@ -481,13 +442,16 @@ function StatItem({ value, label, color = "text-foreground" }: { value: string, 
   );
 }
 
-function ThemeCard({ label, active = false, disabled = false }: { label: string, active?: boolean, disabled?: boolean }) {
+function ThemeCard({ label, active = false, disabled = false, onClick }: { label: string, active?: boolean, disabled?: boolean, onClick?: () => void }) {
   return (
-    <div className={cn(
-      "p-6 rounded-xl border-2 text-center space-y-3 transition-all flex flex-col items-center justify-center min-h-[120px]",
-      active ? "border-primary bg-primary/5 shadow-md" : "border-border/50 bg-secondary/5",
-      disabled ? "opacity-30 grayscale cursor-not-allowed" : "cursor-pointer hover:border-primary/50"
-    )}>
+    <div 
+      onClick={!disabled ? onClick : undefined}
+      className={cn(
+        "p-6 rounded-xl border-2 text-center space-y-3 transition-all flex flex-col items-center justify-center min-h-[120px]",
+        active ? "border-primary bg-primary/5 shadow-md" : "border-border/50 bg-secondary/5",
+        disabled ? "opacity-30 grayscale cursor-not-allowed" : "cursor-pointer hover:border-primary/50"
+      )}
+    >
       <div className={cn(
         "w-5 h-5 rounded-full flex items-center justify-center",
         active ? "bg-primary text-white" : "border border-border"
