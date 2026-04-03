@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -22,10 +23,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, serverTimestamp } from "firebase/firestore";
-import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Shield, Calendar, Loader2, Phone } from "lucide-react";
+import { Mail, Shield, Calendar, Loader2, Phone, Trash2, UserMinus } from "lucide-react";
 
 interface MemberDetailsDialogProps {
   memberId: string;
@@ -71,6 +72,31 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
     setUpdating(false);
   };
 
+  const handleRemoveMember = async () => {
+    if (!firestore || !memberId || !isAdmin) return;
+    if (!confirm(`Are you sure you want to remove ${member?.firstName} from the workspace?`)) return;
+
+    try {
+      // 1. Remove from User Profiles
+      const userRef = doc(firestore, "users", memberId);
+      deleteDocumentNonBlocking(userRef);
+
+      // 2. Remove from Workspace Members (Search for doc by userId field is needed in production, 
+      // but here we use memberId as primary key for simplicity in prototype)
+      const memberEntryRef = doc(firestore, "workspaceMembers", memberId);
+      deleteDocumentNonBlocking(memberEntryRef);
+
+      toast({
+        title: "Member Removed",
+        description: "The user has been detached from the organization.",
+        variant: "destructive"
+      });
+      setIsOpen(false);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -88,12 +114,17 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
         ) : member ? (
           <>
             <DialogHeader className="flex flex-col items-center pb-4 border-b border-border/50">
-              <Avatar className="w-24 h-24 border-4 border-white shadow-xl mb-4">
-                <AvatarImage src={`https://picsum.photos/seed/${member.id}/200/200`} />
-                <AvatarFallback className="text-2xl font-bold bg-primary text-white">
-                  {member.firstName?.[0]}{member.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="w-24 h-24 border-4 border-white shadow-xl mb-4">
+                  <AvatarImage src={`https://picsum.photos/seed/${member.id}/200/200`} />
+                  <AvatarFallback className="text-2xl font-bold bg-primary text-white">
+                    {member.firstName?.[0]}{member.lastName?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                {member.isPlaceholder && (
+                  <Badge className="absolute -bottom-2 right-0 bg-orange-500 text-[8px] uppercase">Pending</Badge>
+                )}
+              </div>
               <DialogTitle className="text-2xl font-bold">
                 {member.firstName} {member.lastName}
               </DialogTitle>
@@ -109,7 +140,7 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                     <Shield className="w-3 h-3 text-primary" /> Workspace Role
                   </Label>
-                  {isAdmin ? (
+                  {isAdmin && member.id !== currentUser?.uid ? (
                     <div className="pt-1">
                       <Select value={member.role} onValueChange={handleUpdateRole} disabled={updating}>
                         <SelectTrigger className="h-9">
@@ -153,8 +184,14 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
               )}
             </div>
 
-            <DialogFooter className="sm:justify-center border-t border-border/50 pt-6">
-              <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto px-8 font-bold uppercase tracking-widest text-[10px]">
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 border-t border-border/50 pt-6">
+              {isAdmin && member.id !== currentUser?.uid && (
+                <Button variant="ghost" onClick={handleRemoveMember} className="text-destructive hover:bg-destructive/5 gap-2 text-[10px] font-bold uppercase">
+                  <UserMinus className="w-4 h-4" />
+                  Remove from Team
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setIsOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
                 Close
               </Button>
             </DialogFooter>

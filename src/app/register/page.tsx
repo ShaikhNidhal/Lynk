@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useFirebase } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp, collection } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 
 const LogoIcon = ({ className }: { className?: string }) => (
@@ -41,7 +41,8 @@ export default function RegisterPage() {
     lastName: "",
     email: "",
     password: "",
-    role: "Team Member"
+    workspaceName: "",
+    role: "Admin"
   });
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -49,10 +50,11 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // Create user profile in Firestore
+      // 2. Create User Profile
       const userRef = doc(firestore, "users", user.uid);
       setDocumentNonBlocking(userRef, {
         id: user.uid,
@@ -60,17 +62,43 @@ export default function RegisterPage() {
         lastName: formData.lastName,
         email: formData.email,
         role: formData.role,
-        hasCompletedOnboarding: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
+      // 3. Create Workspace (Multi-tenant foundation)
+      const workspaceRef = doc(collection(firestore, "workspaces"));
+      const workspaceId = workspaceRef.id;
+      
+      setDocumentNonBlocking(workspaceRef, {
+        id: workspaceId,
+        name: formData.workspaceName || `${formData.firstName}'s Workspace`,
+        slug: (formData.workspaceName || formData.firstName).toLowerCase().replace(/\s+/g, '-'),
+        planType: "free",
+        ownerId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // 4. Create Workspace Membership (RBAC link)
+      const memberRef = doc(collection(firestore, "workspaceMembers"));
+      setDocumentNonBlocking(memberRef, {
+        id: memberRef.id,
+        workspaceId: workspaceId,
+        userId: user.uid,
+        role: "owner",
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        joinedAt: serverTimestamp(),
+      }, { merge: true });
+
       toast({
         title: "Registration Successful",
-        description: `Welcome to Lynk, ${formData.firstName}!`,
+        description: `Welcome to SprintFlow, ${formData.firstName}! Workspace "${formData.workspaceName || 'Personal'}" initialized.`,
       });
       
-      router.push("/welcome");
+      router.push("/dashboard");
     } catch (error: any) {
       toast({
         title: "Registration Failed",
@@ -90,11 +118,11 @@ export default function RegisterPage() {
             <div className="w-12 h-12 flex items-center justify-center text-primary">
               <LogoIcon />
             </div>
-            <span className="text-3xl font-bold tracking-tight text-foreground">Lynk</span>
+            <span className="text-3xl font-bold tracking-tight text-foreground">SprintFlow</span>
           </div>
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+          <CardTitle className="text-2xl font-bold">Create your workspace</CardTitle>
           <CardDescription>
-            Enter your details to get started
+            Join thousands of teams managing agile projects.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleRegister}>
@@ -111,7 +139,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">LastName</Label>
+                <Label htmlFor="lastName">Last Name</Label>
                 <Input 
                   id="lastName" 
                   placeholder="Doe" 
@@ -122,11 +150,21 @@ export default function RegisterPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="workspaceName">Company / Workspace Name</Label>
+              <Input 
+                id="workspaceName" 
+                placeholder="Acme Corp" 
+                required 
+                value={formData.workspaceName}
+                onChange={(e) => setFormData({...formData, workspaceName: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Work Email</Label>
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="name@example.com" 
+                placeholder="name@company.com" 
                 required 
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -142,28 +180,11 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Your Role</Label>
-              <Select 
-                value={formData.role} 
-                onValueChange={(value) => setFormData({...formData, role: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Project Manager">Project Manager</SelectItem>
-                  <SelectItem value="Team Member">Team Member</SelectItem>
-                  <SelectItem value="Client">Client</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full h-11" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Register
+              Initialize Workspace
             </Button>
             <div className="text-sm text-center text-muted-foreground">
               Already have an account?{" "}
