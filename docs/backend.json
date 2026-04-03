@@ -38,25 +38,42 @@
       "description": "Represents a client organization or partner.",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
         "name": { "type": "string" },
         "industry": { "type": "string" },
         "sizeRange": { "type": "string" },
         "website": { "type": "string" },
+        "address": { "type": "object" },
+        "billingInfo": { "type": "object" },
         "status": { "type": "string", "enum": ["Active", "Lead", "Inactive", "Churned"] },
         "healthScore": { "type": "number" },
         "lifetimeValue": { "type": "number" },
-        "address": { "type": "object" },
-        "billingInfo": { "type": "object" },
-        "workspaceId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "status"]
     },
+    "Proposal": {
+      "title": "Proposal",
+      "description": "Sales offer or bid for a potential project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "title": { "type": "string" },
+        "value": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Sent", "Accepted", "Rejected"] },
+        "content": { "type": "string" },
+        "sentAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
     "Project": {
       "title": "Project",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
         "companyId": { "type": "string" },
         "companyName": { "type": "string" },
@@ -80,6 +97,8 @@
       "title": "Milestone",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
         "dueDate": { "type": "string", "format": "date" },
@@ -92,6 +111,9 @@
       "title": "Task",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "parentTaskId": { "type": "string" },
         "title": { "type": "string" },
         "description": { "type": "string" },
         "status": { "type": "string" },
@@ -102,13 +124,32 @@
         "assignedToId": { "type": "string" },
         "position": { "type": "number" },
         "dependencies": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string" }
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Comment": {
+      "title": "Comment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "parentCommentId": { "type": "string" },
+        "mentions": { "type": "array", "items": { "type": "string" } },
+        "reactions": { "type": "object" },
+        "entityId": { "type": "string" },
+        "entityType": { "type": "string" },
+        "members": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       }
     },
     "TimeEntry": {
       "title": "TimeEntry",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "userId": { "type": "string" },
         "taskId": { "type": "string" },
         "projectId": { "type": "string" },
@@ -129,11 +170,19 @@
       { "path": "/workspaces/{workspaceId}", "definition": { "entityName": "Workspace" } },
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
       { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
+      { "path": "/users/{userId}/notifications/{id}", "definition": { "entityName": "Notification" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
+      { "path": "/companies/{companyId}/proposals/{id}", "definition": { "entityName": "Proposal" } },
+      { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
+      { "path": "/contacts/{contactId}/interactions/{id}", "definition": { "entityName": "Interaction" } },
+      { "path": "/pipelines/{id}", "definition": { "entityName": "Pipeline" } },
+      { "path": "/deals/{id}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
       { "path": "/projects/{projectId}/milestones/{id}", "definition": { "entityName": "Milestone" } },
       { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } }
+      { "path": "/projects/{projectId}/tasks/{taskId}/subtasks/{id}", "definition": { "entityName": "Task" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/comments/{id}", "definition": { "entityName": "Comment" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/attachments/{id}", "definition": { "entityName": "Attachment" } }
     ]
   }
 }
