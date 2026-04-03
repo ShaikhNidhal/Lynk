@@ -106,6 +106,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "A significant point or event in a project.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date" },
+        "completedDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Pending", "Achieved", "Missed"] },
+        "color": { "type": "string" },
+        "deliverables": { "type": "array", "items": { "type": "string" } },
+        "projectId": { "type": "string" }
+      }
+    },
     "Task": {
       "title": "Task",
       "description": "An individual piece of work within a project.",
@@ -121,6 +136,38 @@
         "projectId": { "type": "string" }
       }
     },
+    "Subtask": {
+      "title": "Subtask",
+      "description": "A smaller task nested under a main task.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "done"] },
+        "taskId": { "type": "string" },
+        "projectId": { "type": "string" }
+      }
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A textual remark left on an entity.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Attachment": {
+      "title": "Attachment",
+      "description": "A file linked to an entity.",
+      "type": "object",
+      "properties": {
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "uploaderId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "TimeEntry": {
       "title": "TimeEntry",
       "description": "Work log record.",
@@ -133,6 +180,17 @@
         "description": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Template": {
+      "title": "Template",
+      "description": "Reusable structure for projects or tasks.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["Project", "Task"] },
+        "data": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -142,14 +200,20 @@
     "structure": [
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
       { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
+      { "path": "/users/{userId}/notifications/{id}", "definition": { "entityName": "object" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
       { "path": "/companies/{companyId}/proposals/{proposalId}", "definition": { "entityName": "Proposal" } },
       { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
       { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
       { "path": "/projects/{projectId}/budgets/{budgetId}", "definition": { "entityName": "Budget" } },
+      { "path": "/projects/{projectId}/milestones/{milestoneId}", "definition": { "entityName": "Milestone" } },
       { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } },
-      { "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } }
+      { "path": "/projects/{projectId}/tasks/{taskId}/subtasks/{subtaskId}", "definition": { "entityName": "Subtask" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/comments/{commentId}", "definition": { "entityName": "Comment" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/attachments/{attachmentId}", "definition": { "entityName": "Attachment" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
+      { "path": "/templates/{templateId}", "definition": { "entityName": "Template" } }
     ]
   }
 }
