@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -12,6 +11,7 @@ import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useState, useMemo } from "react";
 import { CreateDealDialog } from "@/components/crm/create-deal-dialog";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const STAGES = [
   { id: "prospecting", name: "Prospecting", color: "bg-blue-500" },

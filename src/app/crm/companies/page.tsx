@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -11,6 +10,7 @@ import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { CreateCompanyDialog } from "@/components/crm/create-company-dialog";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 export default function CompaniesPage() {
