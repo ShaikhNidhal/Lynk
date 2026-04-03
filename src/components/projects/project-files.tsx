@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { 
   File, 
   Folder, 
@@ -17,14 +16,17 @@ import {
   Paperclip,
   MoreVertical,
   X,
-  FileText
+  FileText,
+  Upload
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, orderBy } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
@@ -43,13 +45,12 @@ interface ProjectFilesProps {
 }
 
 export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, storage, firestore } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isAdding, setIsAdding] = useState(false);
-  const [formData, setFormData] = useState({ name: "", url: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch project-level attachments
   const filesQuery = useMemoFirebase(() => {
@@ -69,45 +70,75 @@ export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
     );
   }, [files, searchTerm]);
 
-  const handleAddFile = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !user || !firestore) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !storage || !profile?.currentWorkspaceId) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
 
     setIsSubmitting(true);
-    const filesRef = collection(firestore, "projects", projectId, "attachments");
-    
-    // Simulate recording the attachment after a "upload"
-    const fileUrl = formData.url.trim() || `https://picsum.photos/seed/${Math.random()}/800/600`;
+    try {
+      // Path based on multi-tenant security rules: /workspaces/{workspaceId}/{allPaths=**}
+      const storagePath = `workspaces/${profile.currentWorkspaceId}/projects/${projectId}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
 
-    addDocumentNonBlocking(filesRef, {
-      fileName: formData.name.trim(),
-      fileUrl: fileUrl,
-      uploaderId: user.uid,
-      members: projectMembers,
-      version: 1,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }).finally(() => {
-      setFormData({ name: "", url: "" });
+      const filesRef = collection(firestore, "projects", projectId, "attachments");
+      await addDocumentNonBlocking(filesRef, {
+        fileName: file.name,
+        fileUrl: downloadUrl,
+        storagePath: storagePath,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploaderId: user.uid,
+        members: projectMembers,
+        version: 1,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({ title: "Asset Uploaded", description: `${file.name} has been added to the project.` });
       setIsAdding(false);
+    } catch (error: any) {
+      console.error("Upload failed", error);
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    } finally {
       setIsSubmitting(false);
-      toast({ title: "Asset Recorded", description: "The file has been added to the project repository." });
-    });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
-  const handleDeleteFile = (fileId: string) => {
-    if (!firestore) return;
-    if (!confirm("Remove this asset from the project?")) return;
-    const ref = doc(firestore, "projects", projectId, "attachments", fileId);
-    deleteDocumentNonBlocking(ref);
-    toast({ title: "Asset Removed", variant: "destructive" });
+  const handleDeleteFile = async (file: any) => {
+    if (!firestore || !storage) return;
+    if (!confirm(`Remove "${file.fileName}" from the project?`)) return;
+
+    try {
+      // Delete from Storage if it's a real file
+      if (file.storagePath) {
+        const storageRef = ref(storage, file.storagePath);
+        await deleteObject(storageRef);
+      }
+
+      // Delete from Firestore
+      const docRef = doc(firestore, "projects", projectId, "attachments", file.id);
+      deleteDocumentNonBlocking(docRef);
+      
+      toast({ title: "Asset Removed", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
               placeholder="Search assets..." 
@@ -135,40 +166,23 @@ export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
             </Button>
           </div>
         </div>
-        <Button className="gap-2 bg-primary shadow-lg" onClick={() => setIsAdding(true)}>
-          <Plus className="w-4 h-4" />
-          Add Asset
-        </Button>
+        <div className="flex items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+          />
+          <Button 
+            className="gap-2 bg-primary shadow-lg" 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload Asset
+          </Button>
+        </div>
       </div>
-
-      {isAdding && (
-        <Card className="border-primary/20 bg-primary/5 border-dashed">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary/70">Record New Project Asset</CardTitle>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsAdding(false)}><X className="w-4 h-4" /></Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddFile} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Document Name</Label>
-                <Input required placeholder="e.g., Marketing Strategy v2" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-white" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">URL / Source</Label>
-                <div className="flex gap-2">
-                  <Input placeholder="https://..." value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})} className="bg-white flex-1" />
-                  <Button type="submit" disabled={isSubmitting} className="gap-2 px-6">
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Record
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
 
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-primary/20" /></div>
@@ -187,7 +201,7 @@ export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteFile(file.id)}>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteFile(file)}>
                           <Trash2 className="w-4 h-4 mr-2" /> Delete Asset
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -235,7 +249,7 @@ export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
                         <ExternalLink className="w-4 h-4" />
                       </a>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeleteFile(file.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeleteFile(file)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -249,8 +263,8 @@ export function ProjectFiles({ projectId, projectMembers }: ProjectFilesProps) {
           <Folder className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
           <h3 className="text-xl font-bold">No project assets found</h3>
           <p className="text-muted-foreground mb-6">Centralize technical specs, requirements, and design files here.</p>
-          <Button variant="outline" onClick={() => setIsAdding(true)}>
-            Record First Asset
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            Upload First Asset
           </Button>
         </div>
       )}

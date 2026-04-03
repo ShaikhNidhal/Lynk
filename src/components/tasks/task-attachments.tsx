@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { 
   Paperclip, 
   File, 
@@ -10,10 +9,12 @@ import {
   Plus, 
   Loader2, 
   X,
-  ExternalLink
+  ExternalLink,
+  Upload
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -29,11 +30,9 @@ interface TaskAttachmentsProps {
 }
 
 export function TaskAttachments({ projectId, taskId, projectMembers }: TaskAttachmentsProps) {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
-  const [isAdding, setIsAdding] = useState(false);
-  const [formData, setFormData] = useState({ name: "", url: "" });
+  const { user, profile, storage, firestore } = useFirebase();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch attachments with QAP filter
   const attachmentsQuery = useMemoFirebase(() => {
@@ -56,36 +55,62 @@ export function TaskAttachments({ projectId, taskId, projectMembers }: TaskAttac
     });
   }, [rawAttachments]);
 
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !user || !firestore) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !storage || !profile?.currentWorkspaceId) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
 
     setIsSubmitting(true);
-    const attachmentsRef = collection(firestore, "projects", projectId, "tasks", taskId, "attachments");
-    
-    // Simulate real file URL with a placeholder if not provided
-    const fileUrl = formData.url.trim() || `https://picsum.photos/seed/${Math.random()}/800/600`;
+    try {
+      const storagePath = `workspaces/${profile.currentWorkspaceId}/projects/${projectId}/tasks/${taskId}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
 
-    addDocumentNonBlocking(attachmentsRef, {
-      fileName: formData.name.trim(),
-      fileUrl: fileUrl,
-      uploaderId: user.uid,
-      members: projectMembers, // RBAC denormalization
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }).finally(() => {
-      setFormData({ name: "", url: "" });
-      setIsAdding(false);
+      const attachmentsRef = collection(firestore, "projects", projectId, "tasks", taskId, "attachments");
+      await addDocumentNonBlocking(attachmentsRef, {
+        fileName: file.name,
+        fileUrl: downloadUrl,
+        storagePath: storagePath,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploaderId: user.uid,
+        members: projectMembers,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({ title: "Attachment Uploaded" });
+    } catch (error: any) {
+      console.error("Upload failed", error);
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    } finally {
       setIsSubmitting(false);
-      toast({ title: "Attachment added" });
-    });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
-  const handleDelete = (attachmentId: string) => {
-    if (!firestore) return;
-    const ref = doc(firestore, "projects", projectId, "tasks", taskId, "attachments", attachmentId);
-    deleteDocumentNonBlocking(ref);
-    toast({ title: "Attachment removed" });
+  const handleDelete = async (attachment: any) => {
+    if (!firestore || !storage) return;
+    if (!confirm(`Delete "${attachment.fileName}"?`)) return;
+
+    try {
+      if (attachment.storagePath) {
+        const storageRef = ref(storage, attachment.storagePath);
+        await deleteObject(storageRef);
+      }
+
+      const refDoc = doc(firestore, "projects", projectId, "tasks", taskId, "attachments", attachment.id);
+      deleteDocumentNonBlocking(refDoc);
+      toast({ title: "Attachment removed" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -95,47 +120,25 @@ export function TaskAttachments({ projectId, taskId, projectMembers }: TaskAttac
           <Paperclip className="w-4 h-4 text-primary" />
           Task Attachments
         </div>
-        {!isAdding && (
-          <Button variant="ghost" size="sm" onClick={() => setIsAdding(true)} className="h-8 gap-1.5 text-xs text-primary">
-            <Plus className="w-3.5 h-3.5" />
-            Add File
-          </Button>
-        )}
-      </div>
-
-      {isAdding && (
-        <div className="bg-secondary/20 p-4 rounded-lg border border-primary/20 space-y-3 animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold uppercase tracking-wider">New Attachment</h4>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsAdding(false)}>
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="fileName" className="text-[10px] uppercase font-bold text-muted-foreground">File Name</Label>
-            <Input 
-              id="fileName" 
-              placeholder="e.g., Design Specs.pdf" 
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="fileUrl" className="text-[10px] uppercase font-bold text-muted-foreground">URL (Optional)</Label>
-            <Input 
-              id="fileUrl" 
-              placeholder="https://..." 
-              value={formData.url}
-              onChange={(e) => setFormData({...formData, url: e.target.value})}
-            />
-          </div>
-          <Button className="w-full h-8 text-xs" onClick={handleAdd} disabled={!formData.name.trim() || isSubmitting}>
-            {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Plus className="w-3.5 h-3.5 mr-2" />}
-            Save Attachment
+        <div className="flex items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+          />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => fileInputRef.current?.click()} 
+            className="h-8 gap-1.5 text-xs text-primary"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            Upload File
           </Button>
         </div>
-      )}
+      </div>
 
       <ScrollArea className="flex-1 pr-4">
         {isLoading ? (
@@ -169,7 +172,7 @@ export function TaskAttachments({ projectId, taskId, projectMembers }: TaskAttac
                     variant="ghost" 
                     size="icon" 
                     className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10" 
-                    onClick={() => handleDelete(attachment.id)}
+                    onClick={() => handleDelete(attachment)}
                     title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
