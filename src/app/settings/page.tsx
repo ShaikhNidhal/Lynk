@@ -25,7 +25,9 @@ import {
   Briefcase,
   Zap,
   Handshake,
-  Check
+  Check,
+  Phone,
+  Image as ImageIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +47,8 @@ export default function SettingsPage() {
     firstName: "",
     lastName: "",
     email: "",
+    phoneNumber: "",
+    profilePictureUrl: ""
   });
 
   useEffect(() => {
@@ -53,6 +57,8 @@ export default function SettingsPage() {
         firstName: profile.firstName || "",
         lastName: profile.lastName || "",
         email: profile.email || "",
+        phoneNumber: profile.phoneNumber || "",
+        profilePictureUrl: profile.profilePictureUrl || ""
       });
     }
   }, [profile]);
@@ -65,6 +71,8 @@ export default function SettingsPage() {
     updateDocumentNonBlocking(userRef, {
       firstName: formData.firstName,
       lastName: formData.lastName,
+      phoneNumber: formData.phoneNumber,
+      profilePictureUrl: formData.profilePictureUrl,
       updatedAt: serverTimestamp(),
     });
 
@@ -124,14 +132,23 @@ export default function SettingsPage() {
                 <CardContent className="space-y-6">
                   <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-border/50">
                     <Avatar className="w-20 h-20 border-4 border-white shadow-md">
-                      <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200/200`} />
+                      <AvatarImage src={formData.profilePictureUrl || `https://picsum.photos/seed/${user?.uid}/200/200`} />
                       <AvatarFallback className="text-2xl font-bold bg-primary text-white">
                         {formData.firstName?.[0]}{formData.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="space-y-2 text-center sm:text-left">
-                      <Button variant="outline" size="sm" type="button" className="h-8">Change Avatar</Button>
-                      <p className="text-[10px] text-muted-foreground italic">Recommended: Square image, 200x200px</p>
+                    <div className="space-y-2 text-center sm:text-left flex-1">
+                      <Label htmlFor="profilePictureUrl" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                        <ImageIcon className="w-3 h-3" /> Profile Picture URL
+                      </Label>
+                      <Input 
+                        id="profilePictureUrl" 
+                        placeholder="https://example.com/photo.jpg" 
+                        value={formData.profilePictureUrl}
+                        onChange={(e) => setFormData({...formData, profilePictureUrl: e.target.value})}
+                        className="h-8 text-xs"
+                      />
+                      <p className="text-[10px] text-muted-foreground italic">Paste a link to your avatar image</p>
                     </div>
                   </div>
 
@@ -154,17 +171,30 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email Address</Label>
-                    <Input 
-                      id="email" 
-                      value={formData.email} 
-                      readOnly 
-                      className="bg-secondary/20 cursor-not-allowed border-dashed"
-                    />
-                    <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
-                      <Shield className="w-3 h-3 text-primary" /> Managed via Firebase Authentication
-                    </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email Address</Label>
+                      <Input 
+                        id="email" 
+                        value={formData.email} 
+                        readOnly 
+                        className="bg-secondary/20 cursor-not-allowed border-dashed"
+                      />
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+                        <Shield className="w-3 h-3 text-primary" /> Managed by System
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                        <Phone className="w-3 h-3" /> Phone Number
+                      </Label>
+                      <Input 
+                        id="phoneNumber" 
+                        placeholder="+1 (555) 000-0000"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                      />
+                    </div>
                   </div>
                 </CardContent>
                 <CardFooter className="bg-secondary/5 pt-6 flex justify-end">
