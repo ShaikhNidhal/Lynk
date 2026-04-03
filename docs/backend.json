@@ -50,6 +50,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
+    "Proposal": {
+      "title": "Proposal",
+      "description": "A formal offer sent to a client/company.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "companyId": { "type": "string" },
+        "value": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Sent", "Accepted", "Rejected"] },
+        "documentUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "Deal": {
       "title": "Deal",
       "description": "A sales opportunity in the pipeline.",
@@ -81,16 +94,44 @@
         "createdAt": { "type": "string" }
       }
     },
-    "Milestone": {
-      "title": "Milestone",
-      "description": "A major phase or goal within a project.",
+    "Budget": {
+      "title": "Budget",
+      "description": "Financial allocation for a specific project phase.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "spent": { "type": "number" },
+        "category": { "type": "string" },
+        "projectId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "An individual piece of work within a project.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
         "description": { "type": "string" },
-        "dueDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Pending", "Completed", "Overdue"] },
-        "color": { "type": "string" }
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "assignedToId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "projectId": { "type": "string" }
+      }
+    },
+    "TimeEntry": {
+      "title": "TimeEntry",
+      "description": "Work log record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "duration": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -100,11 +141,15 @@
   "firestore": {
     "structure": [
       { "path": "/users/{userId}", "definition": { "entityName": "UserProfile" } },
+      { "path": "/users/{userId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } },
       { "path": "/companies/{companyId}", "definition": { "entityName": "Company" } },
+      { "path": "/companies/{companyId}/proposals/{proposalId}", "definition": { "entityName": "Proposal" } },
       { "path": "/contacts/{contactId}", "definition": { "entityName": "Contact" } },
       { "path": "/deals/{dealId}", "definition": { "entityName": "Deal" } },
       { "path": "/projects/{projectId}", "definition": { "entityName": "Project" } },
-      { "path": "/projects/{projectId}/milestones/{milestoneId}", "definition": { "entityName": "Milestone" } }
+      { "path": "/projects/{projectId}/budgets/{budgetId}", "definition": { "entityName": "Budget" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}", "definition": { "entityName": "Task" } },
+      { "path": "/projects/{projectId}/tasks/{taskId}/timeEntries/{id}", "definition": { "entityName": "TimeEntry" } }
     ]
   }
 }

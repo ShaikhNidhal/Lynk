@@ -36,11 +36,10 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read, write: if isSignedIn();
-      // Keep sub-collection match for legacy/nested support
+      match /proposals/{proposalId} { allow read, write: if isSignedIn(); }
       match /contacts/{contactId} { allow read, write: if isSignedIn(); }
     }
 
-    // Top-level contacts collection for global directory views
     match /contacts/{contactId} {
       allow read, write: if isSignedIn();
     }
@@ -55,11 +54,16 @@ service cloud.firestore {
       allow update: if isMember(resource.data) || isAdmin();
       allow delete: if isAdmin();
 
+      match /budgets/{id} {
+        allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
+      }
+
       match /tasks/{taskId} {
         allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin();
         match /subtasks/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
         match /comments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
         match /attachments/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
+        match /timeEntries/{id} { allow read, write: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) || isAdmin(); }
       }
       
       match /milestones/{milestoneId} {
