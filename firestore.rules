@@ -7,19 +7,6 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    function getGlobalRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && getGlobalRole() == 'Admin';
-    }
-
-    // Ultimate Admin Access - Recursive override for all collections
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-
     function isWorkspaceMember(workspaceId) {
       return isAuthenticated() && 
         exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));

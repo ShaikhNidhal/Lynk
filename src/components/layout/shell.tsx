@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -95,7 +95,6 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
       <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
         <NavItem icon={<LayoutDashboard />} label="Dashboard" href="/dashboard" open={open} onClick={onItemClick} />
         
-        {/* CRM Section */}
         <Collapsible open={crmOpen && open} onOpenChange={setCrmOpen} className="w-full">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
@@ -237,8 +236,14 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, isUserLoading, router]);
+
   if (isUserLoading) return <div className="h-screen w-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  if (!user) { router.push("/login"); return null; }
+  if (!user) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
