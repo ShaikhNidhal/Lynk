@@ -10,11 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
 import { useUser, useFirebase, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, where, doc } from "firebase/firestore";
+import { collection, query, where, doc, serverTimestamp } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export default function ProjectsPage() {
   const { user } = useUser();
