@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -70,47 +71,73 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     userError: null,
   });
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // 1. Handle Auth State Changes
   useEffect(() => {
     if (!auth) {
       setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
       return;
     }
 
-    setUserAuthState(prev => ({ ...prev, isUserLoading: true, userError: null }));
-
     const unsubscribeAuth = onAuthStateChanged(
       auth,
-      async (firebaseUser) => {
-        if (firebaseUser) {
-          // Fetch custom claims to resolve role without Firestore read where possible
-          const tokenResult = await getIdTokenResult(firebaseUser);
-          const claimsRole = tokenResult.claims.role;
-
-          // If logged in, also listen to profile for dynamic updates (like name changes)
-          const userDocRef = doc(firestore, "users", firebaseUser.uid);
-          const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
-            const profileData = docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } : null;
-            
-            setUserAuthState({
-              user: firebaseUser,
-              // Prioritize claims role for security, fallback to Firestore for metadata
-              profile: profileData ? { ...profileData, role: claimsRole || profileData.role } : null,
-              isUserLoading: false,
-              userError: null,
-            });
-          });
-          return () => unsubscribeProfile();
-        } else {
+      (user) => {
+        setCurrentUser(user);
+        if (!user) {
           setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: null });
         }
       },
       (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: error });
+        setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: error }));
       }
     );
     return () => unsubscribeAuth();
-  }, [auth, firestore]);
+  }, [auth]);
+
+  // 2. Handle Profile Listener (Decoupled to fix leaked snapshot listeners)
+  useEffect(() => {
+    if (!currentUser || !firestore) return;
+
+    setUserAuthState(prev => ({ ...prev, isUserLoading: true }));
+
+    let unsubscribeProfile: () => void = () => {};
+
+    const resolveProfile = async () => {
+      try {
+        // Fetch custom claims for role resolution
+        const tokenResult = await getIdTokenResult(currentUser);
+        const claimsRole = tokenResult.claims.role;
+
+        const userDocRef = doc(firestore, "users", currentUser.uid);
+        
+        // Return unsubscribe to effect cleanup
+        unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+          const profileData = docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } : null;
+          
+          setUserAuthState({
+            user: currentUser,
+            profile: profileData ? { ...profileData, role: claimsRole || profileData.role } : null,
+            isUserLoading: false,
+            userError: null,
+          });
+        }, (err) => {
+          console.error("Profile snapshot error:", err);
+          setUserAuthState(prev => ({ ...prev, isUserLoading: false }));
+        });
+      } catch (err: any) {
+        console.error("Auth Token Resolution error:", err);
+        setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: err }));
+      }
+    };
+
+    resolveProfile();
+
+    return () => {
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
+  }, [currentUser, firestore]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth && storage);
