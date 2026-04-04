@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -15,22 +14,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LineChart, Plus, Loader2 } from "lucide-react";
-import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
-import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, serverTimestamp, doc, query, where } from "firebase/firestore";
 import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CreateDealDialog({ initialPipelineId, initialStageId, trigger }: { initialPipelineId?: string, initialStageId?: string, trigger?: React.ReactNode }) {
-  const { firestore } = useFirebase();
-  const { profile } = useUser();
+  const { firestore, profile } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const companiesQuery = useMemoFirebase(() => firestore ? collection(firestore, "companies") : null, [firestore]);
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "companies"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  
   const { data: companies } = useCollection(companiesQuery);
 
-  const pipelinesQuery = useMemoFirebase(() => firestore ? collection(firestore, "pipelines") : null, [firestore]);
+  const pipelinesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "pipelines"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  
   const { data: pipelines } = useCollection(pipelinesQuery);
 
   const [formData, setFormData] = useState({

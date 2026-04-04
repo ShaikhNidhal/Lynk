@@ -1,9 +1,8 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
 import { useFirebase, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, collection, query, where, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { doc, collection, query, where, orderBy, limit } from "firebase/firestore";
 import { use, useState } from "react";
 import { 
   User, 
@@ -12,9 +11,7 @@ import {
   Phone, 
   Calendar, 
   ArrowLeft,
-  Settings,
   Trash2,
-  Plus,
   Loader2,
   MessageSquare,
   Linkedin,
@@ -37,7 +34,7 @@ import { LogInteractionDialog } from "@/components/crm/log-interaction-dialog";
 
 export default function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: contactId } = use(params);
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -59,11 +56,15 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, contactId]);
   const { data: interactions, isLoading: isInteractionsLoading } = useCollection(interactionsQuery);
 
-  // 3. Fetch Deals associated with the contact's company
+  // 3. Fetch Deals associated with the contact's company - filtered by workspace
   const dealsQuery = useMemoFirebase(() => {
-    if (!firestore || !contact?.companyId || contact.companyId === 'none') return null;
-    return query(collection(firestore, "deals"), where("companyId", "==", contact.companyId));
-  }, [firestore, contact?.companyId]);
+    if (!firestore || !contact?.companyId || contact.companyId === 'none' || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "deals"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      where("companyId", "==", contact.companyId)
+    );
+  }, [firestore, contact?.companyId, profile?.currentWorkspaceId]);
   const { data: deals } = useCollection(dealsQuery);
 
   const handleDelete = async () => {

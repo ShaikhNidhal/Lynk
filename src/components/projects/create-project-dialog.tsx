@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -24,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Loader2, Users, Search, X, Briefcase, Building2, DollarSign, Calendar } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, serverTimestamp, query, limit } from "firebase/firestore";
+import { collection, serverTimestamp, query, limit, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -47,10 +46,20 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
     targetEndDate: ""
   });
 
-  const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "users"), limit(50)) : null, [firestore]);
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, "users"), limit(50));
+  }, [firestore]);
   const { data: allUsers } = useCollection(usersQuery);
 
-  const companiesQuery = useMemoFirebase(() => firestore ? collection(firestore, "companies") : null, [firestore]);
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "companies"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  
   const { data: companies } = useCollection(companiesQuery);
 
   const filteredUsers = allUsers?.filter(u => 

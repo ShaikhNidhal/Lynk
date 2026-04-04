@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -14,19 +13,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Loader2, Building2, UserPlus, Mail, Phone, Briefcase } from "lucide-react";
+import { Plus, Loader2, UserPlus } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, serverTimestamp, query } from "firebase/firestore";
+import { collection, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CreateContactDialog({ initialCompanyId = "none", trigger }: { initialCompanyId?: string, trigger?: React.ReactNode }) {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const companiesQuery = useMemoFirebase(() => firestore ? collection(firestore, "companies") : null, [firestore]);
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "companies"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  
   const { data: companies } = useCollection(companiesQuery);
 
   const [formData, setFormData] = useState({
@@ -41,7 +47,7 @@ export function CreateContactDialog({ initialCompanyId = "none", trigger }: { in
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     const selectedCompany = companies?.find(c => c.id === formData.companyId);
@@ -49,6 +55,7 @@ export function CreateContactDialog({ initialCompanyId = "none", trigger }: { in
     try {
       await addDocumentNonBlocking(collection(firestore, "contacts"), {
         ...formData,
+        workspaceId: profile.currentWorkspaceId,
         companyName: selectedCompany?.name || "Independent",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

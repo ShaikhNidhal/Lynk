@@ -1,16 +1,14 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
 import { useFirebase, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, collection, query, where, orderBy, limit, serverTimestamp, deleteDoc } from "firebase/firestore";
-import { use, useState, useMemo } from "react";
+import { doc, collection, query, where, orderBy, limit } from "firebase/firestore";
+import { use, useState } from "react";
 import { 
   Building2, 
   Globe, 
   MapPin, 
   Mail, 
-  Phone, 
   Calendar, 
   TrendingUp, 
   Users, 
@@ -84,11 +82,11 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
-  // 5. Fetch Activity Log - filtered by workspace
+  // 5. Fetch Activity Log - filtered by workspace (aligned path activity_logs)
   const activityQuery = useMemoFirebase(() => {
     if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
     return query(
-      collection(firestore, "activityLogs"), 
+      collection(firestore, "activity_logs"), 
       where("workspaceId", "==", profile.currentWorkspaceId),
       where("entityId", "==", companyId),
       orderBy("createdAt", "desc"),
