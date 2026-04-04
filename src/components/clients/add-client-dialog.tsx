@@ -28,8 +28,7 @@ import { doc, serverTimestamp, collection, query, where } from "firebase/firesto
 import { setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export function AddClientDialog() {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore } = useFirebase();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,24 +40,24 @@ export function AddClientDialog() {
     initialProjectId: "none"
   });
 
-  // Fetch projects the current user can assign the client to
+  // Fetch projects for the active workspace to satisfy security rules
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !profile?.currentWorkspaceId) return null;
     return query(
       collection(firestore, "projects"),
-      where(`members.${user.uid}`, "!=", null)
+      where("workspaceId", "==", profile.currentWorkspaceId)
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, profile?.currentWorkspaceId]);
   
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore || !user) return;
+    if (!firestore || !user || !profile?.currentWorkspaceId) return;
     setLoading(true);
 
     try {
-      // 1. Create the Client User Profile
+      // 1. Create the Client User Profile associated with the current workspace
       const clientId = `client_${Math.random().toString(36).substring(2, 11)}`;
       const clientRef = doc(firestore, "users", clientId);
       
@@ -68,11 +67,25 @@ export function AddClientDialog() {
         lastName: formData.lastName,
         email: formData.email,
         role: "Client",
+        currentWorkspaceId: profile.currentWorkspaceId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 2. Assign to Project if selected
+      // 2. Add them to workspace members sub-collection for rule authorization
+      const memberRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "members", clientId);
+      setDocumentNonBlocking(memberRef, {
+        id: clientId,
+        userId: clientId,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        role: "client",
+        status: "active",
+        joinedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // 3. Assign to Project if selected
       if (formData.initialProjectId !== "none") {
         const projectRef = doc(firestore, "projects", formData.initialProjectId);
         updateDocumentNonBlocking(projectRef, {

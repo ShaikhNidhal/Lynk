@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -17,11 +18,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { 
   Select, 
   SelectContent, 
+  SelectGroup,
+  SelectLabel,
   SelectItem, 
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, Users, Search, X, Briefcase, Building2, DollarSign, Calendar } from "lucide-react";
+import { Plus, Loader2, Users, Search, X, Briefcase, Building2, DollarSign, Calendar, UserCheck } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, query, limit, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -29,8 +32,7 @@ import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) {
-  const { user, profile } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -40,18 +42,20 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
     name: "",
     description: "",
     type: "Scrum",
-    companyId: "none",
+    clientEntityId: "none",
     budget: "",
     startDate: "",
     targetEndDate: ""
   });
 
+  // 1. Fetch potential team members
   const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "users"), limit(50));
   }, [firestore]);
   const { data: allUsers } = useCollection(usersQuery);
 
+  // 2. Fetch Companies for the workspace
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
     return query(
@@ -59,8 +63,18 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
       where("workspaceId", "==", profile.currentWorkspaceId)
     );
   }, [firestore, profile?.currentWorkspaceId]);
-  
   const { data: companies } = useCollection(companiesQuery);
+
+  // 3. Fetch individual Client users for the workspace
+  const clientUsersQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "users"),
+      where("role", "==", "Client"),
+      where("currentWorkspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: clientUsers } = useCollection(clientUsersQuery);
 
   const filteredUsers = allUsers?.filter(u => 
     u.id !== user?.uid && 
@@ -80,26 +94,38 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
     const membersMap: Record<string, string> = { [user.uid]: "owner" };
     selectedMembers.forEach(m => { membersMap[m.id] = m.projectRole; });
 
-    const selectedCompany = companies?.find(c => c.id === formData.companyId);
+    // Determine client name from selection
+    let clientName = "Independent";
+    const selectedCompany = companies?.find(c => c.id === formData.clientEntityId);
+    const selectedClientUser = clientUsers?.find(u => u.id === formData.clientEntityId);
+    
+    if (selectedCompany) clientName = selectedCompany.name;
+    else if (selectedClientUser) clientName = `${selectedClientUser.firstName} ${selectedClientUser.lastName}`;
 
     try {
       addDocumentNonBlocking(collection(firestore, "projects"), {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
+        type: formData.type,
         workspaceId: profile.currentWorkspaceId,
-        companyName: selectedCompany?.name || null,
+        companyId: selectedCompany ? selectedCompany.id : null,
+        clientId: selectedClientUser ? selectedClientUser.id : null,
+        companyName: clientName,
         budget: Number(formData.budget) || null,
         budgetSpent: 0,
         healthStatus: "Good",
         status: "Active",
         ownerId: user.uid,
         members: membersMap,
+        startDate: formData.startDate || null,
+        targetEndDate: formData.targetEndDate || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       toast({ title: "Project Initialized", description: `${formData.name} is now live.` });
       setIsOpen(false);
-      setFormData({ name: "", description: "", type: "Scrum", companyId: "none", budget: "", startDate: "", targetEndDate: "" });
+      setFormData({ name: "", description: "", type: "Scrum", clientEntityId: "none", budget: "", startDate: "", targetEndDate: "" });
       setSelectedMembers([]);
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to create project.", variant: "destructive" });
@@ -128,11 +154,32 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Client Entity</Label>
-                <Select value={formData.companyId} onValueChange={v => setFormData({...formData, companyId: v})}>
-                  <SelectTrigger><SelectValue placeholder="Select Client" /></SelectTrigger>
+                <Select value={formData.clientEntityId} onValueChange={v => setFormData({...formData, clientEntityId: v})}>
+                  <SelectTrigger className="bg-white"><SelectValue placeholder="Select Client or Individual" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Independent / Internal</SelectItem>
-                    {companies?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    
+                    {companies && companies.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[9px] uppercase tracking-widest text-muted-foreground pt-4 flex items-center gap-1.5">
+                          <Building2 className="w-3 h-3" /> Organizations
+                        </SelectLabel>
+                        {companies.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+
+                    {clientUsers && clientUsers.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[9px] uppercase tracking-widest text-muted-foreground pt-4 flex items-center gap-1.5">
+                          <UserCheck className="w-3 h-3" /> Individual Clients
+                        </SelectLabel>
+                        {clientUsers.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -146,7 +193,7 @@ export function CreateProjectDialog({ trigger }: { trigger?: React.ReactNode }) 
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Methodology</Label>
                 <Select value={formData.type} onValueChange={v => setFormData({...formData, type: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Scrum">Agile Scrum</SelectItem>
                     <SelectItem value="Kanban">Kanban</SelectItem>

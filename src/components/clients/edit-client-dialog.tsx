@@ -34,8 +34,7 @@ interface EditClientDialogProps {
 }
 
 export function EditClientDialog({ client, trigger }: EditClientDialogProps) {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { profile, firestore } = useFirebase();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -46,14 +45,14 @@ export function EditClientDialog({ client, trigger }: EditClientDialogProps) {
     email: client.email || "",
   });
 
-  // Fetch all projects the current user can see
+  // Fetch all projects strictly for the current workspace to satisfy rules
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !profile?.currentWorkspaceId) return null;
     return query(
       collection(firestore, "projects"),
-      where(`members.${user.uid}`, "!=", null)
+      where("workspaceId", "==", profile.currentWorkspaceId)
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, profile?.currentWorkspaceId]);
   
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
