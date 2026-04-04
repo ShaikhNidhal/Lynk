@@ -36,10 +36,11 @@ import { useToast } from "@/hooks/use-toast";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: companyId } = use(params);
-  const { firestore, user } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -50,37 +51,50 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, companyId]);
   const { data: company, isLoading: isCompanyLoading } = useDoc(companyRef);
 
-  // 2. Fetch Contacts
+  // 2. Fetch Contacts - filtered by workspace
   const contactsQuery = useMemoFirebase(() => {
-    if (!firestore || !companyId) return null;
-    return query(collection(firestore, "contacts"), where("companyId", "==", companyId));
-  }, [firestore, companyId]);
+    if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "contacts"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      where("companyId", "==", companyId)
+    );
+  }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: contacts, isLoading: isContactsLoading } = useCollection(contactsQuery);
 
-  // 3. Fetch Deals
+  // 3. Fetch Deals - filtered by workspace
   const dealsQuery = useMemoFirebase(() => {
-    if (!firestore || !companyId) return null;
-    return query(collection(firestore, "deals"), where("companyId", "==", companyId));
-  }, [firestore, companyId]);
+    if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "deals"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      where("companyId", "==", companyId)
+    );
+  }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: deals, isLoading: isDealsLoading } = useCollection(dealsQuery);
 
-  // 4. Fetch Projects
+  // 4. Fetch Projects - filtered by workspace
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !companyId) return null;
-    return query(collection(firestore, "projects"), where("companyId", "==", companyId));
-  }, [firestore, companyId]);
+    if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "projects"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      where("companyId", "==", companyId)
+    );
+  }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
-  // 5. Fetch Activity Log
+  // 5. Fetch Activity Log - filtered by workspace
   const activityQuery = useMemoFirebase(() => {
-    if (!firestore || !companyId) return null;
+    if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
     return query(
       collection(firestore, "activityLogs"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
       where("entityId", "==", companyId),
       orderBy("createdAt", "desc"),
       limit(20)
     );
-  }, [firestore, companyId]);
+  }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: activity, isLoading: isActivityLoading } = useCollection(activityQuery);
 
   const handleDelete = async () => {

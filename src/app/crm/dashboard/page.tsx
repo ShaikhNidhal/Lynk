@@ -4,7 +4,7 @@
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { 
   BarChart, 
@@ -31,12 +31,16 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export default function CRMDashboard() {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
 
   const dealsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "deals"), orderBy("createdAt", "desc"));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "deals"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      orderBy("createdAt", "desc")
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
   const { data: deals, isLoading } = useCollection(dealsQuery);
 
   const stats = useMemo(() => {

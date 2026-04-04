@@ -5,7 +5,6 @@ import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/badge"; // Note: Check this import, might be Input from ui/input
 import { Search, Mail, Building, Loader2, Handshake, ExternalLink, FolderKanban, UserCog } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, query, limit, where, doc } from "firebase/firestore";
@@ -17,39 +16,29 @@ import { Input as CustomInput } from "@/components/ui/input";
 import Link from "next/link";
 
 export default function ClientsPage() {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore, isUserLoading: isProfileLoading } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 1. Fetch User Profile for Admin status
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
-
-  // 2. Fetch all users to identify Clients
+  // 2. Fetch all users to identify Clients - global read allowed by rules
   const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "users"), limit(100));
   }, [firestore]);
   const { data: users, isLoading: isUsersLoading } = useCollection(usersQuery);
 
-  // 3. Fetch projects to map them to clients - Admin sees all
+  // 3. Fetch projects to map them to clients - scoped to current workspace
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || isProfileLoading || !profile) return null;
+    if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
     
     const projectsRef = collection(firestore, "projects");
     
-    if (profile.role === 'Admin') {
-      return query(projectsRef);
-    }
-    
+    // Admins see all in workspace, members see joined. 
+    // Both satisfy the rule: isWorkspaceMember(resource.data.workspaceId)
     return query(
       projectsRef,
-      where(`members.${user.uid}`, "!=", null)
+      where("workspaceId", "==", profile.currentWorkspaceId)
     );
-  }, [firestore, user?.uid, profile, isProfileLoading]);
+  }, [firestore, user?.uid, profile?.currentWorkspaceId, isProfileLoading]);
   
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 

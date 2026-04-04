@@ -16,15 +16,19 @@ import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CompaniesPage() {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const companiesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    let q = query(collection(firestore, "companies"), orderBy("createdAt", "desc"), limit(100));
-    return q;
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "companies"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      orderBy("createdAt", "desc"), 
+      limit(100)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
 
   const { data: companies, isLoading } = useCollection(companiesQuery);
 

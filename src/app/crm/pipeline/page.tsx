@@ -18,15 +18,18 @@ import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function PipelinePage() {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string>("default");
 
-  // 1. Fetch all pipelines
+  // 1. Fetch all pipelines for the current workspace
   const pipelinesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "pipelines"));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "pipelines"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
   const { data: pipelines, isLoading: isPipelinesLoading } = useCollection(pipelinesQuery);
 
   const activePipeline = useMemo(() => {
@@ -34,15 +37,16 @@ export default function PipelinePage() {
     return pipelines.find(p => p.id === activePipelineId) || pipelines[0];
   }, [pipelines, activePipelineId]);
 
-  // 2. Fetch deals for the active pipeline
+  // 2. Fetch deals for the active pipeline - restricted to current workspace
   const dealsQuery = useMemoFirebase(() => {
-    if (!firestore || !activePipeline) return null;
+    if (!firestore || !activePipeline || !profile?.currentWorkspaceId) return null;
     return query(
       collection(firestore, "deals"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
       where("pipelineId", "==", activePipeline.id),
       orderBy("createdAt", "desc")
     );
-  }, [firestore, activePipeline]);
+  }, [firestore, activePipeline, profile?.currentWorkspaceId]);
   const { data: deals, isLoading: isDealsLoading } = useCollection(dealsQuery);
 
   const columns = useMemo(() => {

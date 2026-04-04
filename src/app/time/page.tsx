@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -19,8 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 
 export default function TimeTrackingPage() {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore } = useFirebase();
   const { toast } = useToast();
   
   const [activeTime, setActiveTime] = useState(0);
@@ -29,20 +29,15 @@ export default function TimeTrackingPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string>("none");
   const [reportFilter, setReportFilter] = useState("week");
 
-  // 1. Fetch User Profile
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  const { data: profile } = useDoc(userProfileRef);
-
-  // 2. Fetch Projects
+  // 2. Fetch Projects - filtered by workspace
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || !profile) return null;
+    if (!firestore || !user?.uid || !profile?.currentWorkspaceId) return null;
     const projectsRef = collection(firestore, "projects");
-    if (profile.role === 'Admin') return query(projectsRef);
-    return query(projectsRef, where(`members.${user.uid}`, "!=", null));
-  }, [firestore, user?.uid, profile]);
+    return query(
+      projectsRef, 
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, user?.uid, profile?.currentWorkspaceId]);
   const { data: projects } = useCollection(projectsQuery);
 
   // 3. Fetch Active Timer (Persistent State)

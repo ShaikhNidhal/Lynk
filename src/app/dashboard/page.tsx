@@ -39,45 +39,28 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore, isUserLoading: isProfileLoading } = useFirebase();
 
-  // 1. Fetch User Profile
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
-
-  // 2. Fetch Projects
+  // 2. Fetch Projects - filtered by active workspace
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || isProfileLoading || !profile) return null;
+    if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
     const projectsRef = collection(firestore, "projects");
-    if (profile.role === 'Admin') return query(projectsRef, limit(20));
-    return query(projectsRef, where(`members.${user.uid}`, "!=", null), limit(20));
-  }, [firestore, user?.uid, profile, isProfileLoading]);
+    
+    // Always filter by workspaceId to ensure results are allowed by Security Rules
+    return query(
+      projectsRef, 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      limit(20)
+    );
+  }, [firestore, user?.uid, profile?.currentWorkspaceId, isProfileLoading]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
-  // 3. Fetch Team
+  // 3. Fetch Team - restricted to current workspace members
   const teamQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "users"), limit(10));
-  }, [firestore]);
-  const { data: allUsers, isLoading: isTeamLoading } = useCollection(teamQuery);
-
-  // 4. Fetch Recent High-Priority Tasks
-  const upcomingTasksQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    // In a prototype, we fetch from a flattened 'tasks' collection if it exists, 
-    // or just show empty if we only have project-nested tasks. 
-    // Here we'll simulate the "Upcoming" data for the dash.
-    return null;
-  }, [firestore, user?.uid]);
-
-  const teamMembers = useMemo(() => {
-    if (!allUsers) return [];
-    return allUsers.filter(u => u.role !== "Client");
-  }, [allUsers]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "members"), limit(10));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: teamMembers, isLoading: isTeamLoading } = useCollection(teamQuery);
 
   const isLoading = isProfileLoading || isProjectsLoading || isTeamLoading;
 
@@ -123,7 +106,7 @@ export default function DashboardPage() {
           />
           <StatCard 
             title="Internal Team" 
-            value={teamMembers.length.toString()} 
+            value={(teamMembers?.length || 0).toString()} 
             description="Collaborators online" 
             icon={<Users className="text-accent" />} 
           />

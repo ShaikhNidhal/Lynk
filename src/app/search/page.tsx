@@ -4,7 +4,7 @@
 import { AppShell } from "@/components/layout/shell";
 import { useSearchParams } from "next/navigation";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, limit } from "firebase/firestore";
+import { collection, query, limit, where } from "firebase/firestore";
 import { useMemo, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -24,20 +24,28 @@ import { cn } from "@/lib/utils";
 function SearchResultsContent() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q") || "";
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
 
-  // Fetch Projects for search
+  // Fetch Projects for search - strictly scoped to current workspace
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "projects"), limit(50));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "projects"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      limit(50)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
-  // Fetch Contacts for search
+  // Fetch Contacts for search - strictly scoped to current workspace
   const contactsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "contacts"), limit(50));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "contacts"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      limit(50)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
   const { data: contacts, isLoading: isContactsLoading } = useCollection(contactsQuery);
 
   const filtered = useMemo(() => {

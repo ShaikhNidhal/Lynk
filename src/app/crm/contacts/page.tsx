@@ -8,20 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Contact as ContactIcon, Search, Plus, Mail, Phone, Building2, Loader2, Star, ExternalLink } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { CreateContactDialog } from "@/components/crm/create-contact-dialog";
 
 export default function ContactsPage() {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
   const contactsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "contacts"), orderBy("createdAt", "desc"), limit(100));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "contacts"), 
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      orderBy("createdAt", "desc"), 
+      limit(100)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
 
   const { data: contacts, isLoading } = useCollection(contactsQuery);
 

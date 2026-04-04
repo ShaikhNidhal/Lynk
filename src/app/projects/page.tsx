@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
-import { useUser, useFirebase, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, doc, serverTimestamp } from "firebase/firestore";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { format } from "date-fns";
@@ -27,33 +27,22 @@ import {
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export default function ProjectsPage() {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile, firestore, isUserLoading: isProfileLoading } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // 1. Fetch User Profile to check for Admin status
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  const { data: profile, isLoading: isProfileLoading } = useDoc(userProfileRef);
-
-  // 2. Fetch projects - if Admin, show all. Otherwise, filter by membership.
+  // 2. Fetch projects - filter by current workspace for security compliance
   const projectsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || isProfileLoading || !profile) return null;
+    if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
     
     const projectsRef = collection(firestore, "projects");
     
-    if (profile.role === 'Admin') {
-      return query(projectsRef);
-    }
-    
+    // Always filter by workspaceId to satisfy Firestore Security Rules
     return query(
       projectsRef,
-      where(`members.${user.uid}`, "!=", null)
+      where("workspaceId", "==", profile.currentWorkspaceId)
     );
-  }, [firestore, user?.uid, profile, isProfileLoading]);
+  }, [firestore, user?.uid, profile?.currentWorkspaceId, isProfileLoading]);
 
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
