@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -6,12 +5,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Shield, Loader2, Users as UsersIcon } from "lucide-react";
+import { Search, Mail, Shield, Loader2, Users as UsersIcon, ExternalLink } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, limit } from "firebase/firestore";
 import { useState, useMemo } from "react";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { MemberDetailsDialog } from "@/components/team/member-details-dialog";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export default function TeamPage() {
@@ -81,14 +82,23 @@ export default function TeamPage() {
                         </Avatar>
                       </div>
                     </div>
+                    <div className="absolute top-2 right-2">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                        <Link href={`/team/${member.userId || member.id}`}>
+                          <ExternalLink className="w-3.5 h-3.5 text-primary" />
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-12 pb-6 px-6">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-bold text-lg text-foreground leading-tight group-hover:text-primary transition-colors truncate">
-                        {member.firstName} {member.lastName}
-                      </h3>
+                      <Link href={`/team/${member.userId || member.id}`} className="hover:text-primary transition-colors truncate">
+                        <h3 className="font-bold text-lg text-foreground leading-tight">
+                          {member.firstName} {member.lastName}
+                        </h3>
+                      </Link>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                       <Mail className="w-3 h-3 text-primary" />

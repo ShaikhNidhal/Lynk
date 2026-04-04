@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -23,10 +22,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { doc, serverTimestamp } from "firebase/firestore";
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Shield, Calendar, Loader2, Phone, Trash2, UserMinus } from "lucide-react";
+import { Mail, Shield, Calendar, Loader2, Phone, UserMinus, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 interface MemberDetailsDialogProps {
   memberId: string;
@@ -34,8 +34,7 @@ interface MemberDetailsDialogProps {
 }
 
 export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogProps) {
-  const { user: currentUser } = useUser();
-  const { firestore } = useFirebase();
+  const { user: currentUser, firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
@@ -73,17 +72,12 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
   };
 
   const handleRemoveMember = async () => {
-    if (!firestore || !memberId || !isAdmin) return;
+    if (!firestore || !memberId || !isAdmin || !currentUserProfile?.currentWorkspaceId) return;
     if (!confirm(`Are you sure you want to remove ${member?.firstName} from the workspace?`)) return;
 
     try {
-      // 1. Remove from User Profiles
-      const userRef = doc(firestore, "users", memberId);
-      deleteDocumentNonBlocking(userRef);
-
-      // 2. Remove from Workspace Members (Search for doc by userId field is needed in production, 
-      // but here we use memberId as primary key for simplicity in prototype)
-      const memberEntryRef = doc(firestore, "workspaceMembers", memberId);
+      // Remove from Workspace Members sub-collection
+      const memberEntryRef = doc(firestore, "workspaces", currentUserProfile.currentWorkspaceId, "members", memberId);
       deleteDocumentNonBlocking(memberEntryRef);
 
       toast({
@@ -102,7 +96,7 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="ghost" size="sm" className="text-[10px] h-7 font-bold uppercase tracking-wider hover:text-primary hover:bg-primary/5">
-            View Profile
+            Details
           </Button>
         )}
       </DialogTrigger>
@@ -116,13 +110,13 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
             <DialogHeader className="flex flex-col items-center pb-4 border-b border-border/50">
               <div className="relative">
                 <Avatar className="w-24 h-24 border-4 border-white shadow-xl mb-4">
-                  <AvatarImage src={`https://picsum.photos/seed/${member.id}/200/200`} />
+                  <AvatarImage src={member.profilePictureUrl || `https://picsum.photos/seed/${member.id}/200/200`} />
                   <AvatarFallback className="text-2xl font-bold bg-primary text-white">
                     {member.firstName?.[0]}{member.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
-                {member.isPlaceholder && (
-                  <Badge className="absolute -bottom-2 right-0 bg-orange-500 text-[8px] uppercase">Pending</Badge>
+                {member.presenceStatus === 'online' && (
+                  <div className="absolute bottom-4 right-1 w-5 h-5 rounded-full border-4 border-white bg-green-500" />
                 )}
               </div>
               <DialogTitle className="text-2xl font-bold">
@@ -184,16 +178,23 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
               )}
             </div>
 
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 border-t border-border/50 pt-6">
-              {isAdmin && member.id !== currentUser?.uid && (
-                <Button variant="ghost" onClick={handleRemoveMember} className="text-destructive hover:bg-destructive/5 gap-2 text-[10px] font-bold uppercase">
-                  <UserMinus className="w-4 h-4" />
-                  Remove from Team
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => setIsOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                Close
+            <DialogFooter className="flex flex-col gap-3">
+              <Button asChild className="w-full gap-2 font-bold uppercase tracking-widest text-xs h-10 shadow-lg">
+                <Link href={`/team/${member.id}`}>
+                  View Full Profile <ExternalLink className="w-4 h-4" />
+                </Link>
               </Button>
+              <div className="flex gap-2 w-full">
+                {isAdmin && member.id !== currentUser?.uid && (
+                  <Button variant="ghost" onClick={handleRemoveMember} className="flex-1 text-destructive hover:bg-destructive/5 gap-2 text-[10px] font-bold uppercase">
+                    <UserMinus className="w-4 h-4" />
+                    Remove
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setIsOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
+                  Close
+                </Button>
+              </div>
             </DialogFooter>
           </>
         ) : (
