@@ -1,12 +1,12 @@
+
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, limit } from "firebase/firestore";
+import { collection, query, limit, where, collectionGroup } from "firebase/firestore";
 import { useMemo } from "react";
 import { 
-  BarChart, 
   Bar, 
   XAxis, 
   YAxis, 
@@ -20,12 +20,9 @@ import {
 } from "recharts";
 import { 
   Users, 
-  Zap, 
   Loader2, 
   UserCheck, 
-  Clock, 
-  ShieldAlert,
-  Briefcase
+  ShieldAlert
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,31 +30,54 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 export default function TeamWorkloadPage() {
-  const { firestore } = useFirebase();
+  const { firestore, profile } = useFirebase();
 
-  // Fetch Team Members
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "users"), limit(50));
-  }, [firestore]);
-  const { data: users, isLoading } = useCollection(usersQuery);
+  // 1. Fetch Team Members from current workspace
+  const membersQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "members"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  
+  const { data: members, isLoading: isMembersLoading } = useCollection(membersQuery);
 
-  const teamMembers = useMemo(() => {
-    if (!users) return [];
-    return users.filter(u => u.role !== "Client");
-  }, [users]);
+  // 2. Fetch ALL active tasks across the workspace using Collection Group
+  const tasksQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collectionGroup(firestore, "tasks"),
+      where("workspaceId", "==", profile.currentWorkspaceId),
+      where("status", "!=", "done")
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
 
-  // Mock workload data for demonstration
-  // In a real app, you would fetch tasks per user across the workspace
+  const { data: tasks, isLoading: isTasksLoading } = useCollection(tasksQuery);
+
+  // 3. Process workload analytics
   const workloadData = useMemo(() => {
-    return teamMembers.map((member, idx) => ({
-      name: member.firstName || "Member",
-      activeTasks: [4, 7, 2, 9, 12, 5, 3][idx % 7],
-      capacity: 10,
-      allocatedHours: [20, 35, 10, 45, 50, 25, 15][idx % 7],
-      utilization: [20, 35, 10, 45, 50, 25, 15][idx % 7] / 40 * 100
-    }));
-  }, [teamMembers]);
+    if (!members) return [];
+    
+    return members.map((member) => {
+      const activeTasks = tasks?.filter(t => t.assignedToId === member.userId || t.assignedToId === member.id) || [];
+      const totalEstimatedHours = activeTasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
+      
+      // Standard capacity logic: 10 tasks or 40 hours
+      const capacity = 10; 
+      const utilization = (activeTasks.length / capacity) * 100;
+
+      return {
+        id: member.userId || member.id,
+        name: member.firstName || "Member",
+        fullName: `${member.firstName} ${member.lastName}`,
+        email: member.email,
+        activeTasks: activeTasks.length,
+        capacity: capacity,
+        allocatedHours: totalEstimatedHours,
+        utilization: Math.min(utilization, 100)
+      };
+    });
+  }, [members, tasks]);
+
+  const isLoading = isMembersLoading || isTasksLoading;
 
   if (isLoading) {
     return (
@@ -78,10 +98,10 @@ export default function TeamWorkloadPage() {
               <Users className="w-8 h-8 text-accent" />
               Resource Allocation
             </h1>
-            <p className="text-muted-foreground mt-1">Team capacity vs. active task density.</p>
+            <p className="text-muted-foreground mt-1">Team capacity vs. active task density across all boards.</p>
           </div>
           <Badge className="bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 h-8 px-4 font-bold uppercase tracking-widest text-[10px]">
-            Live Utilization Analysis
+            Live Organizational Analysis
           </Badge>
         </div>
 
@@ -90,7 +110,7 @@ export default function TeamWorkloadPage() {
           <Card className="lg:col-span-2 glass-card border-accent/10">
             <CardHeader>
               <CardTitle className="text-lg">Task Load by Member</CardTitle>
-              <CardDescription>Active assignments compared to standard capacity (10 tasks).</CardDescription>
+              <CardDescription>Active assignments compared to standard capacity threshold.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[400px] w-full mt-4">
@@ -99,7 +119,10 @@ export default function TeamWorkloadPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                     <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                    <Tooltip cursor={{fill: 'hsl(var(--secondary)/0.5)'}} />
+                    <Tooltip 
+                      cursor={{fill: 'hsl(var(--secondary)/0.5)'}}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                    />
                     <Legend verticalAlign="top" height={36} />
                     <Bar name="Active Tasks" dataKey="activeTasks" radius={[4, 4, 0, 0]}>
                       {workloadData.map((entry, index) => (
@@ -109,7 +132,7 @@ export default function TeamWorkloadPage() {
                         />
                       ))}
                     </Bar>
-                    <Line name="Capacity Threshold" type="monotone" dataKey="capacity" stroke="#6b7280" strokeDasharray="5 5" />
+                    <Line name="Soft Capacity Threshold" type="monotone" dataKey="capacity" stroke="#6b7280" strokeDasharray="5 5" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -135,17 +158,17 @@ export default function TeamWorkloadPage() {
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] font-bold uppercase">
                         <span>Utilization</span>
-                        <span>{Math.round(d.utilization)}%</span>
+                        <span>{Math.round((d.activeTasks / d.capacity) * 100)}%</span>
                       </div>
-                      <Progress value={d.utilization} className="h-1 bg-white/50" />
+                      <Progress value={(d.activeTasks / d.capacity) * 100} className="h-1 bg-white/50" />
                     </div>
-                    <p className="text-[10px] text-muted-foreground italic">Consider reassigning 2-3 high-priority items to available members.</p>
+                    <p className="text-[10px] text-muted-foreground italic">Member has {d.activeTasks} active items. Consider reassigning tasks to available team members.</p>
                   </div>
                 ))}
                 {workloadData.filter(d => d.activeTasks > d.capacity).length === 0 && (
                   <div className="text-center py-12 text-muted-foreground italic text-sm">
                     <UserCheck className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                    No capacity warnings found.
+                    No capacity warnings found. Team is healthy.
                   </div>
                 )}
               </div>
@@ -156,29 +179,32 @@ export default function TeamWorkloadPage() {
           <Card className="lg:col-span-3 glass-card">
             <CardHeader>
               <CardTitle className="text-lg">Global Availability Hub</CardTitle>
+              <CardDescription>Real-time availability status based on current active task distribution.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {teamMembers.map(member => {
-                  const data = workloadData.find(d => d.name === member.firstName) || { activeTasks: 0, utilization: 0 };
-                  return (
-                    <div key={member.id} className="flex items-center gap-4 p-4 rounded-xl border border-border bg-white hover:shadow-md transition-all">
-                      <Avatar className="w-10 h-10 border-2 border-primary/5">
-                        <AvatarImage src={`https://picsum.photos/seed/${member.id}/100/100`} />
-                        <AvatarFallback>{member.firstName?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate">{member.firstName} {member.lastName}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-[8px] h-4 px-1">{data.activeTasks} Tasks</Badge>
-                          <span className={cn("text-[9px] font-bold uppercase", data.activeTasks > 10 ? "text-destructive" : "text-accent")}>
-                            {data.activeTasks > 10 ? 'At Risk' : 'Available'}
-                          </span>
-                        </div>
+                {workloadData.map(member => (
+                  <div key={member.id} className="flex items-center gap-4 p-4 rounded-xl border border-border bg-white hover:shadow-md transition-all group">
+                    <Avatar className="w-10 h-10 border-2 border-primary/5 group-hover:border-primary/20 transition-all">
+                      <AvatarImage src={`https://picsum.photos/seed/${member.id}/100/100`} />
+                      <AvatarFallback>{member.name?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold truncate">{member.fullName}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="text-[8px] h-4 px-1">{member.activeTasks} Tasks</Badge>
+                        <span className={cn("text-[9px] font-bold uppercase tracking-wider", member.activeTasks >= member.capacity ? "text-destructive" : "text-accent")}>
+                          {member.activeTasks >= member.capacity ? 'AT CAPACITY' : 'AVAILABLE'}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
+                {workloadData.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-muted-foreground italic text-sm">
+                    No active workspace members found to analyze.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

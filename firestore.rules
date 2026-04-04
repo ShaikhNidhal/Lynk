@@ -58,6 +58,11 @@ service cloud.firestore {
       }
     }
 
+    // Collection Group rule for global task analytics
+    match /{path=**}/tasks/{taskId} {
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
+    }
+
     // CRM rules
     match /companies/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);

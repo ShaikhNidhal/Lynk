@@ -22,7 +22,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, User, Clock } from "lucide-react";
+import { Plus, Loader2, Clock } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, query, where } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -37,7 +37,7 @@ interface CreateTaskDialogProps {
 }
 
 export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "todo", trigger }: CreateTaskDialogProps) {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { firestore } = useFirebase();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -67,7 +67,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !firestore || !projectId) return;
+    if (!user || !firestore || !projectId || !profile?.currentWorkspaceId) return;
 
     setLoading(true);
     try {
@@ -84,6 +84,7 @@ export function CreateTaskDialog({ projectId, projectMembers, initialStatus = "t
         ownerId: user.uid,
         assignedToId: formData.assignedToId === "unassigned" ? null : formData.assignedToId,
         projectId: projectId,
+        workspaceId: profile.currentWorkspaceId, // Critical for analytics
         members: projectMembers, 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
