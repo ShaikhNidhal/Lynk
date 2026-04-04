@@ -21,6 +21,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow write: if request.auth.uid == userId;
+
+      match /notifications/{id} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      match /timeEntries/{id} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
     
     // Workspaces - members only
@@ -53,22 +61,22 @@ service cloud.firestore {
     // CRM rules
     match /companies/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);
-      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || (resource != null && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']));
     }
     
     match /deals/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);
-      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || (resource != null && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']));
     }
 
     match /pipelines/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);
-      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || (resource != null && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']));
     }
 
     match /contacts/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);
-      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']);
+      allow write: if hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'manager']) || (resource != null && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'manager']));
     }
     
     // Activity logs - append-only
