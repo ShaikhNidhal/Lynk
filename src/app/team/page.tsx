@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppShell } from "@/components/layout/shell";
@@ -20,7 +21,6 @@ export default function TeamPage() {
   const { firestore } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch members from the workspace sub-collection
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
     return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "members"), limit(100));
@@ -37,6 +37,8 @@ export default function TeamPage() {
     );
   }, [members, searchTerm]);
 
+  const isAdmin = profile?.role === 'Admin';
+
   return (
     <AppShell>
       <div className="space-y-8">
@@ -44,11 +46,11 @@ export default function TeamPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
               Team Directory
-              {profile?.role === 'Admin' && <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px]">Org Admin</Badge>}
+              {isAdmin && <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px]">Org Admin</Badge>}
             </h1>
             <p className="text-muted-foreground mt-1">Manage workspace participants and real-time availability.</p>
           </div>
-          <InviteMemberDialog />
+          {isAdmin && <InviteMemberDialog />}
         </div>
 
         <div className="relative max-w-md">
@@ -128,7 +130,7 @@ export default function TeamPage() {
             <UsersIcon className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">Workspace is empty</h3>
             <p className="text-muted-foreground mb-4">Start by inviting your first team member to collaborate.</p>
-            <InviteMemberDialog />
+            {isAdmin && <InviteMemberDialog />}
           </div>
         )}
       </div>

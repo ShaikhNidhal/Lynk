@@ -59,19 +59,11 @@ const LogoIcon = ({ className }: { className?: string }) => (
 );
 
 const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (open: boolean) => void }) => {
-  const { user } = useUser();
-  const { firestore } = useFirebase();
+  const { user, profile } = useFirebase();
   const router = useRouter();
   const pathname = usePathname();
   const [crmOpen, setCrmOpen] = useState(pathname.startsWith('/crm'));
   const [analyticsOpen, setAnalyticsOpen] = useState(pathname.includes('dashboard') || pathname.includes('workload'));
-
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return doc(firestore, "users", user.uid);
-  }, [firestore, user?.uid]);
-  
-  const { data: profile } = useDoc(userProfileRef);
 
   const handleLogout = async () => {
     const { auth } = await import("@/firebase").then(m => m.initializeFirebase());
@@ -82,6 +74,11 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   const onItemClick = () => {
     if (setMobileOpen) setMobileOpen(false);
   };
+
+  const role = profile?.role || "Team Member";
+  const isAdmin = role === 'Admin';
+  const isManager = role === 'Project Manager';
+  const isClient = role === 'Client';
 
   return (
     <div className="flex flex-col h-full">
@@ -95,44 +92,53 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
       <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
         <NavItem icon={<LayoutDashboard />} label="Dashboard" href="/dashboard" open={open} onClick={onItemClick} />
         
-        <Collapsible open={crmOpen && open} onOpenChange={setCrmOpen} className="w-full">
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
-              <div className="flex items-center gap-3">
-                <LineChart className="w-5 h-5" />
-                {open && <span className="font-semibold">CRM Hub</span>}
-              </div>
-              {open && <ChevronDown className={cn("w-4 h-4 transition-transform", crmOpen && "rotate-180")} />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1 mt-1 pl-4">
-            <NavItem icon={<Target />} label="Revenue Dash" href="/crm/dashboard" open={open} onClick={onItemClick} sub />
-            <NavItem icon={<Briefcase />} label="Pipelines" href="/crm/pipeline" open={open} onClick={onItemClick} sub />
-            <NavItem icon={<Building2 />} label="Companies" href="/crm/companies" open={open} onClick={onItemClick} sub />
-            <NavItem icon={<ContactIcon />} label="Contacts" href="/crm/contacts" open={open} onClick={onItemClick} sub />
-          </CollapsibleContent>
-        </Collapsible>
+        {(isAdmin || isManager) && (
+          <Collapsible open={crmOpen && open} onOpenChange={setCrmOpen} className="w-full">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
+                <div className="flex items-center gap-3">
+                  <LineChart className="w-5 h-5" />
+                  {open && <span className="font-semibold">CRM Hub</span>}
+                </div>
+                {open && <ChevronDown className={cn("w-4 h-4 transition-transform", crmOpen && "rotate-180")} />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-1 mt-1 pl-4">
+              <NavItem icon={<Target />} label="Revenue Dash" href="/crm/dashboard" open={open} onClick={onItemClick} sub />
+              <NavItem icon={<Briefcase />} label="Pipelines" href="/crm/pipeline" open={open} onClick={onItemClick} sub />
+              <NavItem icon={<Building2 />} label="Companies" href="/crm/companies" open={open} onClick={onItemClick} sub />
+              <NavItem icon={<ContactIcon />} label="Contacts" href="/crm/contacts" open={open} onClick={onItemClick} sub />
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
-        <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
         
-        <Collapsible open={analyticsOpen && open} onOpenChange={setAnalyticsOpen} className="w-full">
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
-              <div className="flex items-center gap-3">
-                <BarChart2 className="w-5 h-5" />
-                {open && <span className="font-semibold">Analytics</span>}
-              </div>
-              {open && <ChevronDown className={cn("w-4 h-4 transition-transform", analyticsOpen && "rotate-180")} />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1 mt-1 pl-4">
-            <NavItem icon={<Zap />} label="Team Workload" href="/team/workload" open={open} onClick={onItemClick} sub />
-            <NavItem icon={<Users />} label="Directory" href="/team" open={open} onClick={onItemClick} sub />
-          </CollapsibleContent>
-        </Collapsible>
+        {!isClient && (
+          <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
+        )}
+        
+        {(isAdmin || isManager) && (
+          <Collapsible open={analyticsOpen && open} onOpenChange={setAnalyticsOpen} className="w-full">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
+                <div className="flex items-center gap-3">
+                  <BarChart2 className="w-5 h-5" />
+                  {open && <span className="font-semibold">Analytics</span>}
+                </div>
+                {open && <ChevronDown className={cn("w-4 h-4 transition-transform", analyticsOpen && "rotate-180")} />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-1 mt-1 pl-4">
+              <NavItem icon={<Zap />} label="Team Workload" href="/team/workload" open={open} onClick={onItemClick} sub />
+              {!isClient && <NavItem icon={<Users />} label="Directory" href="/team" open={open} onClick={onItemClick} sub />}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
-        <NavItem icon={<Handshake />} label="Client Portal" href="/clients" open={open} onClick={onItemClick} />
+        {(isAdmin || isManager) && (
+          <NavItem icon={<Handshake />} label="Client Portal" href="/clients" open={open} onClick={onItemClick} />
+        )}
         
         <div className="pt-4 mt-4 border-t border-border">
           <NavItem icon={<Settings />} label="Settings" href="/settings" open={open} onClick={onItemClick} />
@@ -197,6 +203,7 @@ const NavItem = ({ icon, label, href, open, onClick, sub }: { icon: React.ReactN
 
 const TopNav = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { profile } = useFirebase();
   const router = useRouter();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -205,6 +212,9 @@ const TopNav = ({ onMenuClick }: { onMenuClick: () => void }) => {
       router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
+
+  const isAdmin = profile?.role === 'Admin';
+  const isManager = profile?.role === 'Project Manager';
 
   return (
     <header className="h-16 border-b bg-card/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10">
@@ -224,7 +234,9 @@ const TopNav = ({ onMenuClick }: { onMenuClick: () => void }) => {
       </div>
       <div className="flex items-center gap-3">
         <NotificationBell />
-        <CreateProjectDialog trigger={<Button size="sm" className="gap-2 shadow-lg bg-primary"><Plus className="w-4 h-4" /><span className="hidden xs:inline">New Project</span></Button>} />
+        {(isAdmin || isManager) && (
+          <CreateProjectDialog trigger={<Button size="sm" className="gap-2 shadow-lg bg-primary"><Plus className="w-4 h-4" /><span className="hidden xs:inline">New Project</span></Button>} />
+        )}
       </div>
     </header>
   );

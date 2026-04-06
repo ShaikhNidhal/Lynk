@@ -31,15 +31,10 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // 2. Fetch projects - filter by current workspace for security compliance
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
-    
-    const projectsRef = collection(firestore, "projects");
-    
-    // Always filter by workspaceId to satisfy Firestore Security Rules
     return query(
-      projectsRef,
+      collection(firestore, "projects"),
       where("workspaceId", "==", profile.currentWorkspaceId)
     );
   }, [firestore, user?.uid, profile?.currentWorkspaceId, isProfileLoading]);
@@ -64,6 +59,10 @@ export default function ProjectsPage() {
     });
   }, [projects, searchTerm, statusFilter]);
 
+  const role = profile?.role || "Team Member";
+  const isAdmin = role === 'Admin';
+  const isManager = role === 'Project Manager';
+
   return (
     <AppShell>
       <div className="space-y-8">
@@ -71,13 +70,13 @@ export default function ProjectsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
               Projects
-              {profile?.role === 'Admin' && (
+              {isAdmin && (
                 <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">Admin View</Badge>
               )}
             </h1>
             <p className="text-muted-foreground mt-1">Manage your team's agile and kanban workflows.</p>
           </div>
-          <CreateProjectDialog />
+          {(isAdmin || isManager) && <CreateProjectDialog />}
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-4">
@@ -136,7 +135,7 @@ export default function ProjectsPage() {
                     <h3 className="text-xl font-bold tracking-tight group-hover:text-primary transition-colors truncate">
                       {project.name}
                     </h3>
-                    <DropdownMenuActions project={project} isAdmin={profile?.role === 'Admin'} />
+                    <DropdownMenuActions project={project} isAdmin={isAdmin} />
                   </div>
                   {project.companyName && (
                     <p className="text-xs font-bold text-accent uppercase tracking-widest flex items-center gap-1.5">
@@ -194,7 +193,7 @@ export default function ProjectsPage() {
             <FolderKanban className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">No projects found</h3>
             <p className="text-muted-foreground mb-8">You haven't been assigned to any projects yet or your search matched nothing.</p>
-            <CreateProjectDialog />
+            {(isAdmin || isManager) && <CreateProjectDialog />}
           </div>
         )}
       </div>

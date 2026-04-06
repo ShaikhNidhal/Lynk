@@ -45,8 +45,6 @@ export default function DashboardPage() {
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
     const projectsRef = collection(firestore, "projects");
-    
-    // Always filter by workspaceId to ensure results are allowed by Security Rules
     return query(
       projectsRef, 
       where("workspaceId", "==", profile.currentWorkspaceId),
@@ -74,6 +72,10 @@ export default function DashboardPage() {
     );
   }
 
+  const role = profile?.role || "Team Member";
+  const isAdmin = role === 'Admin';
+  const isManager = role === 'Project Manager';
+
   return (
     <AppShell>
       <div className="space-y-8 pb-12">
@@ -86,14 +88,16 @@ export default function DashboardPage() {
               Your organizational oversight for {format(new Date(), "MMMM do, yyyy")}.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/crm/dashboard" className="gap-2"><TrendingUp className="w-4 h-4" /> Sales Stats</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/projects" className="gap-2"><Plus className="w-4 h-4" /> New Initiative</Link>
-            </Button>
-          </div>
+          {(isAdmin || isManager) && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/crm/dashboard" className="gap-2"><TrendingUp className="w-4 h-4" /> Sales Stats</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/projects" className="gap-2"><Plus className="w-4 h-4" /> New Initiative</Link>
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Strategic Metrics */}

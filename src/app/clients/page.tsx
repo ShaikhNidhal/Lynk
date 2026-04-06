@@ -19,23 +19,22 @@ export default function ClientsPage() {
   const { user, profile, firestore, isUserLoading: isProfileLoading } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 2. Fetch all users to identify Clients - global read allowed by rules
+  // 2. Fetch all users to identify Clients - strictly scoped to current workspace context
   const usersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "users"), limit(100));
-  }, [firestore]);
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "users"), 
+      where("currentWorkspaceId", "==", profile.currentWorkspaceId),
+      limit(100)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
   const { data: users, isLoading: isUsersLoading } = useCollection(usersQuery);
 
   // 3. Fetch projects to map them to clients - scoped to current workspace
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || isProfileLoading || !profile?.currentWorkspaceId) return null;
-    
-    const projectsRef = collection(firestore, "projects");
-    
-    // Admins see all in workspace, members see joined. 
-    // Both satisfy the rule: isWorkspaceMember(resource.data.workspaceId)
     return query(
-      projectsRef,
+      collection(firestore, "projects"),
       where("workspaceId", "==", profile.currentWorkspaceId)
     );
   }, [firestore, user?.uid, profile?.currentWorkspaceId, isProfileLoading]);
@@ -55,11 +54,12 @@ export default function ClientsPage() {
     );
   }, [users, searchTerm]);
 
-  // Helper to get projects for a specific client
   const getClientProjects = (clientId: string) => {
     if (!projects) return [];
     return projects.filter(p => p.members && p.members[clientId]);
   };
+
+  const isAdmin = profile?.role === 'Admin';
 
   return (
     <AppShell>
@@ -68,11 +68,11 @@ export default function ClientsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
               Client Management
-              {profile?.role === 'Admin' && <Badge variant="outline" className="bg-primary/5 text-primary">Admin Override</Badge>}
+              {isAdmin && <Badge variant="outline" className="bg-primary/5 text-primary">Admin Access</Badge>}
             </h1>
             <p className="text-muted-foreground mt-1">Manage external stakeholders and track their project engagement.</p>
           </div>
-          <AddClientDialog />
+          {isAdmin && <AddClientDialog />}
         </div>
 
         <div className="relative max-w-md">
@@ -107,14 +107,16 @@ export default function ClientsPage() {
                         </Avatar>
                       </div>
                       <div className="absolute top-2 right-2">
-                        <EditClientDialog 
-                          client={client} 
-                          trigger={
-                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                              <UserCog className="w-3.5 h-3.5 text-accent" />
-                            </Button>
-                          }
-                        />
+                        {isAdmin && (
+                          <EditClientDialog 
+                            client={client} 
+                            trigger={
+                              <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                <UserCog className="w-3.5 h-3.5 text-accent" />
+                              </Button>
+                            }
+                          />
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -160,11 +162,6 @@ export default function ClientsPage() {
                         ) : (
                           <p className="text-[10px] text-muted-foreground italic py-2">No projects assigned yet.</p>
                         )}
-                        {clientProjects.length > 3 && (
-                          <p className="text-[10px] text-accent font-bold text-center pt-1">
-                            + {clientProjects.length - 3} more projects
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -172,7 +169,7 @@ export default function ClientsPage() {
                       <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest italic">
                         External Portal
                       </div>
-                      <EditClientDialog client={client} />
+                      {isAdmin && <EditClientDialog client={client} />}
                     </div>
                   </CardContent>
                 </Card>
@@ -184,7 +181,7 @@ export default function ClientsPage() {
             <Handshake className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">No clients found</h3>
             <p className="text-muted-foreground mb-4">Onboard your first external stakeholder to start collaborative project management.</p>
-            <AddClientDialog />
+            {isAdmin && <AddClientDialog />}
           </div>
         )}
       </div>
