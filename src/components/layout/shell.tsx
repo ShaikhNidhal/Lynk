@@ -88,7 +88,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
       <div className="p-4 mb-4">
         <Link href="/dashboard" onClick={onItemClick} className={cn("flex items-center gap-2", !open && "lg:justify-center")}>
           <div className="w-8 h-8 text-primary shrink-0"><LogoIcon /></div>
-          {open && <span className="text-xl font-bold tracking-tight text-foreground">SprintFlow</span>}
+          {open && <span className="text-xl font-bold tracking-tight text-foreground">Lynk</span>}
         </Link>
       </div>
       

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -101,7 +102,7 @@ export default function RegisterPage() {
 
       toast({
         title: "Registration Successful",
-        description: `Welcome to SprintFlow, ${formData.firstName}! Workspace initialized.`,
+        description: `Welcome to Lynk, ${formData.firstName}! Workspace initialized.`,
       });
       
       router.push("/dashboard");
@@ -124,7 +125,7 @@ export default function RegisterPage() {
             <div className="w-12 h-12 flex items-center justify-center text-primary">
               <LogoIcon />
             </div>
-            <span className="text-3xl font-bold tracking-tight text-foreground">SprintFlow</span>
+            <span className="text-3xl font-bold tracking-tight text-foreground">Lynk</span>
           </div>
           <CardTitle className="text-2xl font-bold">Create your workspace</CardTitle>
           <CardDescription>
