@@ -25,7 +25,8 @@ import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Shield, Calendar, Loader2, Phone, UserMinus, ExternalLink } from "lucide-react";
+import { Mail, Shield, Calendar, Loader2, Phone, UserMinus, ExternalLink, Building2, Briefcase, Users } from "lucide-react";
+
 import Link from "next/link";
 
 interface MemberDetailsDialogProps {
@@ -51,6 +52,34 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
     return doc(firestore, "users", memberId);
   }, [firestore, memberId]);
   const { data: member, isLoading } = useDoc(memberRef);
+
+  // Fetch member workspace doc for corporate hierarchy IDs
+  const memberDocRef = useMemoFirebase(() => {
+    if (!firestore || !currentUserProfile?.currentWorkspaceId || !memberId) return null;
+    return doc(firestore, "workspaces", currentUserProfile.currentWorkspaceId, "members", memberId);
+  }, [firestore, currentUserProfile?.currentWorkspaceId, memberId]);
+  const { data: memberWorkspaceDoc } = useDoc(memberDocRef);
+
+  // Fetch Subsidiary details
+  const subsidiaryRef = useMemoFirebase(() => {
+    if (!firestore || !currentUserProfile?.currentWorkspaceId || !memberWorkspaceDoc?.subsidiaryId) return null;
+    return doc(firestore, "workspaces", currentUserProfile.currentWorkspaceId, "subsidiaries", memberWorkspaceDoc.subsidiaryId);
+  }, [firestore, currentUserProfile?.currentWorkspaceId, memberWorkspaceDoc?.subsidiaryId]);
+  const { data: subsidiary } = useDoc(subsidiaryRef);
+
+  // Fetch Department details
+  const departmentRef = useMemoFirebase(() => {
+    if (!firestore || !currentUserProfile?.currentWorkspaceId || !memberWorkspaceDoc?.departmentId) return null;
+    return doc(firestore, "workspaces", currentUserProfile.currentWorkspaceId, "departments", memberWorkspaceDoc.departmentId);
+  }, [firestore, currentUserProfile?.currentWorkspaceId, memberWorkspaceDoc?.departmentId]);
+  const { data: department } = useDoc(departmentRef);
+
+  // Fetch Team details
+  const teamRef = useMemoFirebase(() => {
+    if (!firestore || !currentUserProfile?.currentWorkspaceId || !memberWorkspaceDoc?.teamId) return null;
+    return doc(firestore, "workspaces", currentUserProfile.currentWorkspaceId, "teams", memberWorkspaceDoc.teamId);
+  }, [firestore, currentUserProfile?.currentWorkspaceId, memberWorkspaceDoc?.teamId]);
+  const { data: team } = useDoc(teamRef);
 
   const isAdmin = currentUserProfile?.role === 'Admin';
 
@@ -174,6 +203,35 @@ export function MemberDetailsDialog({ memberId, trigger }: MemberDetailsDialogPr
                     <Phone className="w-3 h-3 text-primary" /> Contact Number
                   </Label>
                   <p className="text-sm font-medium pt-1">{member.phoneNumber}</p>
+                </div>
+              )}
+
+              {(subsidiary || department || team) && (
+                <div className="space-y-3 border-t pt-4 border-border/50">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Corporate Alignment</Label>
+                  <div className="grid grid-cols-1 gap-2.5 text-xs font-semibold">
+                    {subsidiary && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span>Company:</span>
+                        <span className="text-foreground font-bold">{subsidiary.name}</span>
+                      </div>
+                    )}
+                    {department && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Briefcase className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span>Department:</span>
+                        <span className="text-foreground font-bold">{department.name}</span>
+                      </div>
+                    )}
+                    {team && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Users className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span>Team:</span>
+                        <span className="text-foreground font-bold">{team.name}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

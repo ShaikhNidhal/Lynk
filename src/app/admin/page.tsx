@@ -164,6 +164,291 @@ export default function AdminPage() {
       setUpdatingGlobalRole(null);
     }
   };
+  // Corporate Hierarchy States
+  const [newSubsidiaryName, setNewSubsidiaryName] = useState("");
+  const [editingSubsidiary, setEditingSubsidiary] = useState<any>(null);
+  const [editSubsidiaryName, setEditSubsidiaryName] = useState("");
+  const [isCreateSubsidiaryOpen, setIsCreateSubsidiaryOpen] = useState(false);
+  const [isEditSubsidiaryOpen, setIsEditSubsidiaryOpen] = useState(false);
+
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [newDepartmentSubId, setNewDepartmentSubId] = useState("");
+  const [editingDepartment, setEditingDepartment] = useState<any>(null);
+  const [editDepartmentName, setEditDepartmentName] = useState("");
+  const [editDepartmentSubId, setEditDepartmentSubId] = useState("");
+  const [isCreateDepartmentOpen, setIsCreateDepartmentOpen] = useState(false);
+  const [isEditDepartmentOpen, setIsEditDepartmentOpen] = useState(false);
+
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamSubId, setNewTeamSubId] = useState("");
+  const [newTeamDeptId, setNewTeamDeptId] = useState("");
+  const [editingTeam, setEditingTeam] = useState<any>(null);
+  const [editTeamName, setEditTeamName] = useState("");
+  const [editTeamSubId, setEditTeamSubId] = useState("");
+  const [editTeamDeptId, setEditTeamDeptId] = useState("");
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
+
+  const [assigningMember, setAssigningMember] = useState<any>(null);
+  const [isAssignMemberOpen, setIsAssignMemberOpen] = useState(false);
+  const [memberAssignedSubId, setMemberAssignedSubId] = useState("");
+  const [memberAssignedDeptId, setMemberAssignedDeptId] = useState("");
+  const [memberAssignedTeamId, setMemberAssignedTeamId] = useState("");
+
+  // Corporate Hierarchy Queries
+  const subsidiariesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: subsidiaries, isLoading: isSubsidiariesLoading } = useCollection(subsidiariesQuery);
+
+  const departmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "departments"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: departments, isLoading: isDepartmentsLoading } = useCollection(departmentsQuery);
+
+  const teamsQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "teams"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: teams, isLoading: isTeamsLoading } = useCollection(teamsQuery);
+
+  // Corporate Hierarchy Handlers
+  const handleAddSubsidiary = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !newSubsidiaryName) return;
+    const subId = `sub_${Math.random().toString(36).substring(2, 11)}`;
+    const subRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries", subId);
+    try {
+      await setDoc(subRef, {
+        id: subId,
+        name: newSubsidiaryName,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast({
+        title: "Subsidiary Created",
+        description: `Successfully created company subsidiary "${newSubsidiaryName}".`,
+      });
+      setNewSubsidiaryName("");
+      setIsCreateSubsidiaryOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to create subsidiary",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditSubsidiary = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !editingSubsidiary || !editSubsidiaryName) return;
+    const subRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries", editingSubsidiary.id);
+    try {
+      await setDoc(subRef, { name: editSubsidiaryName, updatedAt: serverTimestamp() }, { merge: true });
+      toast({
+        title: "Subsidiary Updated",
+        description: `Successfully renamed subsidiary.`,
+      });
+      setEditingSubsidiary(null);
+      setEditSubsidiaryName("");
+      setIsEditSubsidiaryOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to update subsidiary",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteSubsidiary = async (id: string) => {
+    if (!firestore || !profile?.currentWorkspaceId) return;
+    if (!confirm("Are you sure you want to delete this subsidiary? Departments and teams under this subsidiary will be affected.")) return;
+    const subRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries", id);
+    try {
+      await deleteDoc(subRef);
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Successfully deleted subsidiary.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to delete subsidiary",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddDepartment = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !newDepartmentName || !newDepartmentSubId) return;
+    const deptId = `dept_${Math.random().toString(36).substring(2, 11)}`;
+    const deptRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "departments", deptId);
+    try {
+      await setDoc(deptRef, {
+        id: deptId,
+        name: newDepartmentName,
+        subsidiaryId: newDepartmentSubId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast({
+        title: "Department Created",
+        description: `Successfully created department "${newDepartmentName}".`,
+      });
+      setNewDepartmentName("");
+      setNewDepartmentSubId("");
+      setIsCreateDepartmentOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to create department",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditDepartment = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !editingDepartment || !editDepartmentName || !editDepartmentSubId) return;
+    const deptRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "departments", editingDepartment.id);
+    try {
+      await setDoc(deptRef, { name: editDepartmentName, subsidiaryId: editDepartmentSubId, updatedAt: serverTimestamp() }, { merge: true });
+      toast({
+        title: "Department Updated",
+        description: `Successfully updated department details.`,
+      });
+      setEditingDepartment(null);
+      setEditDepartmentName("");
+      setEditDepartmentSubId("");
+      setIsEditDepartmentOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to update department",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteDepartment = async (id: string) => {
+    if (!firestore || !profile?.currentWorkspaceId) return;
+    if (!confirm("Are you sure you want to delete this department? Teams under this department will be affected.")) return;
+    const deptRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "departments", id);
+    try {
+      await deleteDoc(deptRef);
+      toast({
+        title: "Department Deleted",
+        description: "Successfully deleted department.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to delete department",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddTeam = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !newTeamName || !newTeamSubId || !newTeamDeptId) return;
+    const teamId = `team_${Math.random().toString(36).substring(2, 11)}`;
+    const teamRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "teams", teamId);
+    try {
+      await setDoc(teamRef, {
+        id: teamId,
+        name: newTeamName,
+        subsidiaryId: newTeamSubId,
+        departmentId: newTeamDeptId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast({
+        title: "Team Created",
+        description: `Successfully created team "${newTeamName}".`,
+      });
+      setNewTeamName("");
+      setNewTeamSubId("");
+      setNewTeamDeptId("");
+      setIsCreateTeamOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to create team",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditTeam = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !editingTeam || !editTeamName || !editTeamSubId || !editTeamDeptId) return;
+    const teamRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "teams", editingTeam.id);
+    try {
+      await setDoc(teamRef, { name: editTeamName, subsidiaryId: editTeamSubId, departmentId: editTeamDeptId, updatedAt: serverTimestamp() }, { merge: true });
+      toast({
+        title: "Team Updated",
+        description: `Successfully updated team details.`,
+      });
+      setEditingTeam(null);
+      setEditTeamName("");
+      setEditTeamSubId("");
+      setEditTeamDeptId("");
+      setIsEditTeamOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to update team",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteTeam = async (id: string) => {
+    if (!firestore || !profile?.currentWorkspaceId) return;
+    if (!confirm("Are you sure you want to delete this team?")) return;
+    const teamRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "teams", id);
+    try {
+      await deleteDoc(teamRef);
+      toast({
+        title: "Team Deleted",
+        description: "Successfully deleted team.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to delete team",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSaveMemberAssignments = async () => {
+    if (!firestore || !profile?.currentWorkspaceId || !assigningMember) return;
+    const memberRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "members", assigningMember.id);
+    try {
+      await setDoc(memberRef, {
+        subsidiaryId: memberAssignedSubId || "",
+        departmentId: memberAssignedDeptId || "",
+        teamId: memberAssignedTeamId || ""
+      }, { merge: true });
+      
+      toast({
+        title: "Assignments Saved",
+        description: `Updated corporate alignment for ${assigningMember.firstName}.`,
+      });
+      setIsAssignMemberOpen(false);
+      setAssigningMember(null);
+      setMemberAssignedSubId("");
+      setMemberAssignedDeptId("");
+      setMemberAssignedTeamId("");
+    } catch (e: any) {
+      toast({
+        title: "Failed to save assignments",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
 
 
   // 2. Fetch all members in the current workspace
@@ -856,16 +1141,19 @@ export default function AdminPage() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Main Controls: Tabs for User Management & Roles/Permissions */}
           <Tabs defaultValue="users" className="lg:col-span-2 space-y-6">
-            <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'} bg-secondary/10 h-auto gap-2 p-2 rounded-xl`}>
+            <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} bg-secondary/10 h-auto gap-2 p-2 rounded-xl`}>
               <TabsTrigger value="users" className="gap-2 text-xs py-2">
                 <Users className="w-4 h-4" /> Users Directory
               </TabsTrigger>
               <TabsTrigger value="roles" className="gap-2 text-xs py-2">
                 <Key className="w-4 h-4" /> Roles & Permissions
               </TabsTrigger>
+              <TabsTrigger value="hierarchy" className="gap-2 text-xs py-2">
+                <Building2 className="w-4 h-4" /> Corporate Hierarchy
+              </TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="saas" className="gap-2 text-xs py-2">
-                  <Building2 className="w-4 h-4" /> Global SaaS Control
+                  <Shield className="w-4 h-4" /> Global SaaS Control
                 </TabsTrigger>
               )}
             </TabsList>
@@ -1050,6 +1338,345 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Corporate Hierarchy Management Tab */}
+            <TabsContent value="hierarchy" className="mt-0 space-y-6">
+              {/* Subsidiaries Management */}
+              <Card className="glass-card">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Subsidiaries (Companies)</CardTitle>
+                    <CardDescription>Manage internal legal entities and business subsidiaries under the holdings group.</CardDescription>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="gap-1.5 text-xs font-bold uppercase tracking-wider"
+                    onClick={() => {
+                      setNewSubsidiaryName("");
+                      setIsCreateSubsidiaryOpen(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4" /> Add Subsidiary
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isSubsidiariesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : subsidiaries && subsidiaries.length > 0 ? (
+                    <div className="border rounded-xl overflow-hidden bg-white/50">
+                      <Table>
+                        <TableHeader className="bg-secondary/5">
+                          <TableRow>
+                            <TableHead>Company Name</TableHead>
+                            <TableHead>ID</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {subsidiaries.map((sub) => (
+                            <TableRow key={sub.id}>
+                              <TableCell className="font-bold flex items-center gap-2 py-3">
+                                <Building2 className="w-4 h-4 text-primary" />
+                                {sub.name}
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground">{sub.id}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="h-8 text-xs font-bold"
+                                    onClick={() => {
+                                      setEditingSubsidiary(sub);
+                                      setEditSubsidiaryName(sub.name);
+                                      setIsEditSubsidiaryOpen(true);
+                                    }}
+                                  >
+                                    Rename
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="h-8 text-xs font-bold text-destructive border-destructive/20 hover:bg-destructive/5"
+                                    onClick={() => handleDeleteSubsidiary(sub.id)}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed rounded-xl opacity-50 italic text-sm">
+                      No subsidiaries created yet. Click &quot;Add Subsidiary&quot; to begin.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Departments Management */}
+              <Card className="glass-card">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Departments</CardTitle>
+                    <CardDescription>Manage divisions and functional departments within your subsidiaries.</CardDescription>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="gap-1.5 text-xs font-bold uppercase tracking-wider"
+                    disabled={!subsidiaries || subsidiaries.length === 0}
+                    onClick={() => {
+                      setNewDepartmentName("");
+                      setNewDepartmentSubId(subsidiaries?.[0]?.id || "");
+                      setIsCreateDepartmentOpen(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4" /> Add Department
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isDepartmentsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : departments && departments.length > 0 ? (
+                    <div className="border rounded-xl overflow-hidden bg-white/50">
+                      <Table>
+                        <TableHeader className="bg-secondary/5">
+                          <TableRow>
+                            <TableHead>Department Name</TableHead>
+                            <TableHead>Subsidiary Company</TableHead>
+                            <TableHead>ID</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {departments.map((dept) => {
+                            const parentSub = subsidiaries?.find(s => s.id === dept.subsidiaryId);
+                            return (
+                              <TableRow key={dept.id}>
+                                <TableCell className="font-bold py-3">{dept.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-[10px] font-bold">
+                                    {parentSub?.name || "Unknown Subsidiary"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground">{dept.id}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="h-8 text-xs font-bold"
+                                      onClick={() => {
+                                        setEditingDepartment(dept);
+                                        setEditDepartmentName(dept.name);
+                                        setEditDepartmentSubId(dept.subsidiaryId);
+                                        setIsEditDepartmentOpen(true);
+                                      }}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="h-8 text-xs font-bold text-destructive border-destructive/20 hover:bg-destructive/5"
+                                      onClick={() => handleDeleteDepartment(dept.id)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed rounded-xl opacity-50 italic text-sm">
+                      No departments created yet. Click &quot;Add Department&quot; to begin.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Teams Management */}
+              <Card className="glass-card">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Teams</CardTitle>
+                    <CardDescription>Manage tactical team groups inside corporate departments.</CardDescription>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="gap-1.5 text-xs font-bold uppercase tracking-wider"
+                    disabled={!departments || departments.length === 0}
+                    onClick={() => {
+                      setNewTeamName("");
+                      setNewTeamSubId(departments?.[0]?.subsidiaryId || "");
+                      setNewTeamDeptId(departments?.[0]?.id || "");
+                      setIsCreateTeamOpen(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4" /> Add Team
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isTeamsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : teams && teams.length > 0 ? (
+                    <div className="border rounded-xl overflow-hidden bg-white/50">
+                      <Table>
+                        <TableHeader className="bg-secondary/5">
+                          <TableRow>
+                            <TableHead>Team Name</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Subsidiary</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {teams.map((team) => {
+                            const parentDept = departments?.find(d => d.id === team.departmentId);
+                            const parentSub = subsidiaries?.find(s => s.id === team.subsidiaryId);
+                            return (
+                              <TableRow key={team.id}>
+                                <TableCell className="font-bold py-3">{team.name}</TableCell>
+                                <TableCell className="text-xs font-medium text-muted-foreground">
+                                  {parentDept?.name || "Unknown Dept"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-[10px] font-bold">
+                                    {parentSub?.name || "Unknown Subsidiary"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="h-8 text-xs font-bold"
+                                      onClick={() => {
+                                        setEditingTeam(team);
+                                        setEditTeamName(team.name);
+                                        setEditTeamSubId(team.subsidiaryId);
+                                        setEditTeamDeptId(team.departmentId);
+                                        setIsEditTeamOpen(true);
+                                      }}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="h-8 text-xs font-bold text-destructive border-destructive/20 hover:bg-destructive/5"
+                                      onClick={() => handleDeleteTeam(team.id)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed rounded-xl opacity-50 italic text-sm">
+                      No teams created yet. Click &quot;Add Team&quot; to begin.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Member Assignments */}
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">Corporate Directory Mapping</CardTitle>
+                  <CardDescription>Assign workspace participants to their respective Subsidiary, Department, and Team.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isMembersLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="border rounded-xl overflow-hidden bg-white/50">
+                      <Table>
+                        <TableHeader className="bg-secondary/5">
+                          <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Subsidiary</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Team</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {members?.map((member) => {
+                            const sub = subsidiaries?.find(s => s.id === member.subsidiaryId);
+                            const dept = departments?.find(d => d.id === member.departmentId);
+                            const team = teams?.find(t => t.id === member.teamId);
+                            return (
+                              <TableRow key={member.id}>
+                                <TableCell className="font-bold flex items-center gap-3 py-3">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={`https://picsum.photos/seed/${member.id}/100/100`} />
+                                    <AvatarFallback>{member.firstName?.[0]}</AvatarFallback>
+                                  </Avatar>
+                                  <span>{member.firstName} {member.lastName}</span>
+                                </TableCell>
+                                <TableCell className="text-xs font-semibold">
+                                  {sub ? sub.name : <span className="text-muted-foreground italic">Unassigned</span>}
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-muted-foreground">
+                                  {dept ? dept.name : <span className="italic">Unassigned</span>}
+                                </TableCell>
+                                <TableCell>
+                                  {team ? (
+                                    <Badge variant="secondary" className="text-[10px] font-bold">
+                                      {team.name}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground italic">Unassigned</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="h-8 text-xs font-bold uppercase tracking-wider"
+                                    onClick={() => {
+                                      setAssigningMember(member);
+                                      setMemberAssignedSubId(member.subsidiaryId || "");
+                                      setMemberAssignedDeptId(member.departmentId || "");
+                                      setMemberAssignedTeamId(member.teamId || "");
+                                      setIsAssignMemberOpen(true);
+                                    }}
+                                  >
+                                    Assign Unit
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
 
             {/* Global SaaS Control Tab */}
             {isAdmin && (
@@ -1491,6 +2118,390 @@ export default function AdminPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Assign Member Dialog */}
+          <Dialog open={isAssignMemberOpen} onOpenChange={setIsAssignMemberOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  Map Member to Corporate Unit
+                </DialogTitle>
+                <DialogDescription>
+                  Align {assigningMember?.firstName} {assigningMember?.lastName} with a Subsidiary, Department, and Team.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="member-sub-select">Subsidiary Company</Label>
+                  <Select 
+                    value={memberAssignedSubId} 
+                    onValueChange={(v) => {
+                      setMemberAssignedSubId(v);
+                      setMemberAssignedDeptId("");
+                      setMemberAssignedTeamId("");
+                    }}
+                  >
+                    <SelectTrigger id="member-sub-select" className="bg-white">
+                      <SelectValue placeholder="Select Subsidiary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none_clear">Unassigned</SelectItem>
+                      {subsidiaries?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="member-dept-select">Department</Label>
+                  <Select 
+                    disabled={!memberAssignedSubId || memberAssignedSubId === "none_clear"}
+                    value={memberAssignedDeptId} 
+                    onValueChange={(v) => {
+                      setMemberAssignedDeptId(v);
+                      setMemberAssignedTeamId("");
+                    }}
+                  >
+                    <SelectTrigger id="member-dept-select" className="bg-white">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none_clear">Unassigned</SelectItem>
+                      {departments?.filter(d => d.subsidiaryId === memberAssignedSubId).map(dept => (
+                        <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="member-team-select">Team</Label>
+                  <Select 
+                    disabled={!memberAssignedDeptId || memberAssignedDeptId === "none_clear"}
+                    value={memberAssignedTeamId} 
+                    onValueChange={setMemberAssignedTeamId}
+                  >
+                    <SelectTrigger id="member-team-select" className="bg-white">
+                      <SelectValue placeholder="Select Team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none_clear">Unassigned</SelectItem>
+                      {teams?.filter(t => t.departmentId === memberAssignedDeptId).map(team => (
+                        <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsAssignMemberOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveMemberAssignments}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Save Alignment
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create Subsidiary Dialog */}
+          <Dialog open={isCreateSubsidiaryOpen} onOpenChange={setIsCreateSubsidiaryOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Add Subsidiary Company</DialogTitle>
+                <DialogDescription>Create a new company subsidiary under this holdings group.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-sub-name">Company Name</Label>
+                  <Input 
+                    id="create-sub-name"
+                    placeholder="e.g. Lynk Tech LLC"
+                    value={newSubsidiaryName}
+                    onChange={(e) => setNewSubsidiaryName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsCreateSubsidiaryOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!newSubsidiaryName}
+                  onClick={handleAddSubsidiary}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Create Company
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Subsidiary Dialog */}
+          <Dialog open={isEditSubsidiaryOpen} onOpenChange={setIsEditSubsidiaryOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Rename Subsidiary Company</DialogTitle>
+                <DialogDescription>Update the name of this subsidiary company.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-sub-name">Company Name</Label>
+                  <Input 
+                    id="edit-sub-name"
+                    value={editSubsidiaryName}
+                    onChange={(e) => setEditSubsidiaryName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEditSubsidiaryOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!editSubsidiaryName}
+                  onClick={handleEditSubsidiary}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create Department Dialog */}
+          <Dialog open={isCreateDepartmentOpen} onOpenChange={setIsCreateDepartmentOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Add Department</DialogTitle>
+                <DialogDescription>Create a department division within a subsidiary.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-dept-name">Department Name</Label>
+                  <Input 
+                    id="create-dept-name"
+                    placeholder="e.g. Engineering"
+                    value={newDepartmentName}
+                    onChange={(e) => setNewDepartmentName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-dept-sub-select">Subsidiary Company</Label>
+                  <Select value={newDepartmentSubId} onValueChange={setNewDepartmentSubId}>
+                    <SelectTrigger id="create-dept-sub-select" className="bg-white">
+                      <SelectValue placeholder="Select Subsidiary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subsidiaries?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsCreateDepartmentOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!newDepartmentName || !newDepartmentSubId}
+                  onClick={handleAddDepartment}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Create Department
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Department Dialog */}
+          <Dialog open={isEditDepartmentOpen} onOpenChange={setIsEditDepartmentOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Edit Department</DialogTitle>
+                <DialogDescription>Modify details for this department.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dept-name">Department Name</Label>
+                  <Input 
+                    id="edit-dept-name"
+                    value={editDepartmentName}
+                    onChange={(e) => setEditDepartmentName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dept-sub-select">Subsidiary Company</Label>
+                  <Select value={editDepartmentSubId} onValueChange={setEditDepartmentSubId}>
+                    <SelectTrigger id="edit-dept-sub-select" className="bg-white">
+                      <SelectValue placeholder="Select Subsidiary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subsidiaries?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEditDepartmentOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!editDepartmentName || !editDepartmentSubId}
+                  onClick={handleEditDepartment}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create Team Dialog */}
+          <Dialog open={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Add Team</DialogTitle>
+                <DialogDescription>Create a team inside a corporate department.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-team-name">Team Name</Label>
+                  <Input 
+                    id="create-team-name"
+                    placeholder="e.g. Frontend Core"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-team-sub-select">Subsidiary Company</Label>
+                  <Select 
+                    value={newTeamSubId} 
+                    onValueChange={(v) => {
+                      setNewTeamSubId(v);
+                      setNewTeamDeptId("");
+                    }}
+                  >
+                    <SelectTrigger id="create-team-sub-select" className="bg-white">
+                      <SelectValue placeholder="Select Subsidiary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subsidiaries?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-team-dept-select">Department</Label>
+                  <Select 
+                    disabled={!newTeamSubId}
+                    value={newTeamDeptId} 
+                    onValueChange={setNewTeamDeptId}
+                  >
+                    <SelectTrigger id="create-team-dept-select" className="bg-white">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments?.filter(d => d.subsidiaryId === newTeamSubId).map(dept => (
+                        <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsCreateTeamOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!newTeamName || !newTeamSubId || !newTeamDeptId}
+                  onClick={handleAddTeam}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Create Team
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Team Dialog */}
+          <Dialog open={isEditTeamOpen} onOpenChange={setIsEditTeamOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Edit Team</DialogTitle>
+                <DialogDescription>Modify details for this team.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-team-name">Team Name</Label>
+                  <Input 
+                    id="edit-team-name"
+                    value={editTeamName}
+                    onChange={(e) => setEditTeamName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-team-sub-select">Subsidiary Company</Label>
+                  <Select 
+                    value={editTeamSubId} 
+                    onValueChange={(v) => {
+                      setEditTeamSubId(v);
+                      setEditTeamDeptId("");
+                    }}
+                  >
+                    <SelectTrigger id="edit-team-sub-select" className="bg-white">
+                      <SelectValue placeholder="Select Subsidiary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subsidiaries?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-team-dept-select">Department</Label>
+                  <Select 
+                    disabled={!editTeamSubId}
+                    value={editTeamDeptId} 
+                    onValueChange={setEditTeamDeptId}
+                  >
+                    <SelectTrigger id="edit-team-dept-select" className="bg-white">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments?.filter(d => d.subsidiaryId === editTeamSubId).map(dept => (
+                        <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEditTeamOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!editTeamName || !editTeamSubId || !editTeamDeptId}
+                  onClick={handleEditTeam}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
 
           {/* Database Tools Sidebar */}
           <div className="space-y-6">

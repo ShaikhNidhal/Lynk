@@ -14,28 +14,57 @@ import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
 import { MemberDetailsDialog } from "@/components/team/member-details-dialog";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, Landmark, Users, Briefcase } from "lucide-react";
 
 export default function TeamPage() {
   const { user, profile } = useUser();
   const { firestore } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [selectedSubId, setSelectedSubId] = useState("all");
+  const [selectedDeptId, setSelectedDeptId] = useState("all");
+  const [selectedTeamId, setSelectedTeamId] = useState("all");
+
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
     return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "members"), limit(100));
   }, [firestore, profile?.currentWorkspaceId]);
-  
   const { data: members, isLoading: isMembersLoading } = useCollection(membersQuery);
+
+  const subsidiariesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: subsidiaries } = useCollection(subsidiariesQuery);
+
+  const departmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "departments"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: departments } = useCollection(departmentsQuery);
+
+  const teamsQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "workspaces", profile.currentWorkspaceId, "teams"), limit(100));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: teams } = useCollection(teamsQuery);
 
   const filteredMembers = useMemo(() => {
     if (!members) return [];
-    return members.filter(m => 
-      m.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [members, searchTerm]);
+    return members.filter(m => {
+      const matchesSearch = 
+        m.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSub = selectedSubId === "all" || m.subsidiaryId === selectedSubId;
+      const matchesDept = selectedDeptId === "all" || m.departmentId === selectedDeptId;
+      const matchesTeam = selectedTeamId === "all" || m.teamId === selectedTeamId;
+      
+      return matchesSearch && matchesSub && matchesDept && matchesTeam;
+    });
+  }, [members, searchTerm, selectedSubId, selectedDeptId, selectedTeamId]);
 
   const isAdmin = profile?.role === 'Admin';
 
@@ -53,14 +82,75 @@ export default function TeamPage() {
           {isAdmin && <InviteMemberDialog />}
         </div>
 
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search team by name or email..." 
-            className="pl-9 bg-white border-none shadow-sm" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+          <div className="relative flex-1 w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search team by name or email..." 
+              className="pl-9 bg-white border-none shadow-sm h-10" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+            {/* Subsidiary Filter */}
+            <Select value={selectedSubId} onValueChange={(v) => {
+              setSelectedSubId(v);
+              setSelectedDeptId("all");
+              setSelectedTeamId("all");
+            }}>
+              <SelectTrigger className="w-[170px] bg-white border-none shadow-sm text-xs h-10">
+                <Building2 className="w-3.5 h-3.5 mr-2 opacity-60 text-primary shrink-0" />
+                <SelectValue placeholder="Company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {subsidiaries?.map(sub => (
+                  <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Department Filter */}
+            <Select 
+              value={selectedDeptId} 
+              onValueChange={(v) => {
+                setSelectedDeptId(v);
+                setSelectedTeamId("all");
+              }}
+              disabled={selectedSubId === "all"}
+            >
+              <SelectTrigger className="w-[170px] bg-white border-none shadow-sm text-xs h-10">
+                <Briefcase className="w-3.5 h-3.5 mr-2 opacity-60 text-primary shrink-0" />
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments?.filter(d => d.subsidiaryId === selectedSubId).map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Team Filter */}
+            <Select 
+              value={selectedTeamId} 
+              onValueChange={setSelectedTeamId}
+              disabled={selectedDeptId === "all"}
+            >
+              <SelectTrigger className="w-[170px] bg-white border-none shadow-sm text-xs h-10">
+                <UsersIcon className="w-3.5 h-3.5 mr-2 opacity-60 text-primary shrink-0" />
+                <SelectValue placeholder="Team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {teams?.filter(t => t.departmentId === selectedDeptId).map(team => (
+                  <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isMembersLoading ? (
@@ -108,11 +198,36 @@ export default function TeamPage() {
                     </div>
                   </div>
                   
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Badge variant="outline" className="bg-white/50 text-[10px] font-bold uppercase tracking-wider py-0.5 border-primary/10">
-                      <Shield className="w-3 h-3 mr-1 text-primary" />
-                      {member.role || "Member"}
-                    </Badge>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline" className="bg-white/50 text-[9px] font-bold uppercase tracking-wider py-0.5 border-primary/10">
+                        <Shield className="w-2.5 h-2.5 mr-1 text-primary" />
+                        {member.role || "Member"}
+                      </Badge>
+                    </div>
+
+                    {(member.subsidiaryId || member.departmentId || member.teamId) && (
+                      <div className="flex flex-col gap-1 mt-2 text-[10px] text-muted-foreground font-semibold border-t pt-2.5">
+                        {member.subsidiaryId && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Building2 className="w-3 h-3 text-primary shrink-0" />
+                            <span className="truncate">{subsidiaries?.find(s => s.id === member.subsidiaryId)?.name || "Subsidiary"}</span>
+                          </div>
+                        )}
+                        {member.departmentId && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Briefcase className="w-3 h-3 text-primary shrink-0" />
+                            <span className="truncate">{departments?.find(d => d.id === member.departmentId)?.name || "Department"}</span>
+                          </div>
+                        )}
+                        {member.teamId && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Users className="w-3 h-3 text-primary shrink-0" />
+                            <span className="truncate">{teams?.find(t => t.id === member.teamId)?.name || "Team"}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-border flex justify-between items-center">

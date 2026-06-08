@@ -63,6 +63,24 @@ service cloud.firestore {
         allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
         allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
       }
+
+      // Subsidiaries subcollection
+      match /subsidiaries/{subsidiaryId} {
+        allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
+      }
+
+      // Departments subcollection
+      match /departments/{departmentId} {
+        allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
+      }
+
+      // Teams subcollection
+      match /teams/{teamId} {
+        allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
+      }
     }
 
     // ─── Projects ──────────────────────────────────────────────────────────────
