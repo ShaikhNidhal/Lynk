@@ -65,6 +65,7 @@ export default function AdminPage() {
   const isAdmin = profile?.role === "Admin";
 
   // Global SaaS States
+  const [activeTab, setActiveTab] = useState("users");
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
@@ -164,6 +165,325 @@ export default function AdminPage() {
       setUpdatingGlobalRole(null);
     }
   };
+
+  // Lifecycle Management States
+  const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [newWorkspacePlan, setNewWorkspacePlan] = useState("free");
+  const [newWorkspaceOwner, setNewWorkspaceOwner] = useState("");
+
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUserFirstName, setNewUserFirstName] = useState("");
+  const [newUserLastName, setNewUserLastName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserGlobalRole, setNewUserGlobalRole] = useState("Team Member");
+  const [newUserWorkspaceId, setNewUserWorkspaceId] = useState("");
+
+  const [isEditPermissionsOpen, setIsEditPermissionsOpen] = useState(false);
+  const [selectedUserPerms, setSelectedUserPerms] = useState<any>(null);
+  const [userPermsGlobalRole, setUserPermsGlobalRole] = useState("");
+  const [userPermsWorkspaceId, setUserPermsWorkspaceId] = useState("");
+  const [userPermsWorkspaceRole, setUserPermsWorkspaceRole] = useState("");
+  const [userPermsCustomRoles, setUserPermsCustomRoles] = useState<string[]>([]);
+  const [userPermsCustomRolesList, setUserPermsCustomRolesList] = useState<any[]>([]);
+  const [loadingWorkspaceRoles, setLoadingWorkspaceRoles] = useState(false);
+
+  // Lifecycle & Permission Handlers
+  const fetchWorkspaceRoles = async (workspaceId: string) => {
+    if (!firestore || !workspaceId) {
+      setUserPermsCustomRolesList([]);
+      return;
+    }
+    setLoadingWorkspaceRoles(true);
+    try {
+      const snap = await getDocs(collection(firestore, "workspaces", workspaceId, "roles"));
+      const roles = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUserPermsCustomRolesList(roles);
+    } catch (e) {
+      console.error("Failed to load workspace roles:", e);
+      setUserPermsCustomRolesList([]);
+    } finally {
+      setLoadingWorkspaceRoles(false);
+    }
+  };
+
+  const handleOpenEditPermissions = async (u: any) => {
+    setSelectedUserPerms(u);
+    setUserPermsGlobalRole(u.role || "Team Member");
+    setUserPermsWorkspaceId(u.currentWorkspaceId || "");
+    
+    if (u.currentWorkspaceId && firestore) {
+      try {
+        const memberSnap = await getDocs(query(
+          collection(firestore, "workspaces", u.currentWorkspaceId, "members"),
+          where("id", "==", u.id)
+        ));
+        const memberData = memberSnap.docs[0]?.data();
+        setUserPermsWorkspaceRole(memberData?.role || "Team Member");
+        setUserPermsCustomRoles(memberData?.roles || []);
+      } catch (e) {
+        setUserPermsWorkspaceRole("Team Member");
+        setUserPermsCustomRoles([]);
+      }
+      await fetchWorkspaceRoles(u.currentWorkspaceId);
+    } else {
+      setUserPermsWorkspaceRole("Team Member");
+      setUserPermsCustomRoles([]);
+      setUserPermsCustomRolesList([]);
+    }
+    setIsEditPermissionsOpen(true);
+  };
+
+  const handleCreateWorkspace = async () => {
+    if (!firestore || !newWorkspaceName) return;
+    const wsId = `ws_${Math.random().toString(36).substring(2, 11)}`;
+    const slug = newWorkspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const wsRef = doc(firestore, "workspaces", wsId);
+    try {
+      await setDoc(wsRef, {
+        id: wsId,
+        name: newWorkspaceName,
+        slug,
+        planType: newWorkspacePlan,
+        ownerId: newWorkspaceOwner || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      const defaultRoles = [
+        {
+          id: 'role_workspace_administrator',
+          name: 'Workspace Administrator',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update', 'crm:delete',
+            'projects:read', 'projects:create', 'projects:update', 'projects:delete',
+            'tasks:create', 'tasks:update', 'tasks:delete',
+            'settings:read', 'settings:write'
+          ]
+        },
+        {
+          id: 'role_sales_manager',
+          name: 'Sales Manager',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update', 'crm:delete',
+            'projects:read', 'projects:create', 'projects:update',
+            'tasks:create', 'tasks:update'
+          ]
+        },
+        {
+          id: 'role_standard_rep',
+          name: 'Standard Executive Account Representative',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update',
+            'projects:read',
+            'tasks:create', 'tasks:update'
+          ]
+        }
+      ];
+
+      for (const role of defaultRoles) {
+        const roleRef = doc(firestore, "workspaces", wsId, "roles", role.id);
+        await setDoc(roleRef, {
+          id: role.id,
+          name: role.name,
+          permissions: role.permissions,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      if (newWorkspaceOwner) {
+        const ownerUserRef = doc(firestore, "users", newWorkspaceOwner);
+        const memberRef = doc(firestore, "workspaces", wsId, "members", newWorkspaceOwner);
+        const ownerSnap = await getDocs(query(collection(firestore, "users"), where("id", "==", newWorkspaceOwner)));
+        const ownerData = ownerSnap.docs[0]?.data();
+        
+        await setDoc(memberRef, {
+          id: newWorkspaceOwner,
+          workspaceId: wsId,
+          userId: newWorkspaceOwner,
+          role: "Admin",
+          roles: ["role_workspace_administrator"],
+          email: ownerData?.email || "",
+          firstName: ownerData?.firstName || "Owner",
+          lastName: ownerData?.lastName || "",
+          joinedAt: serverTimestamp()
+        });
+
+        await setDoc(ownerUserRef, { currentWorkspaceId: wsId }, { merge: true });
+      }
+
+      toast({
+        title: "Workspace Created",
+        description: `Successfully created workspace "${newWorkspaceName}".`,
+      });
+      setNewWorkspaceName("");
+      setNewWorkspaceOwner("");
+      setIsAddWorkspaceOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to create workspace",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    if (!firestore || !workspaceId) return;
+    if (!confirm(`WARNING: Are you sure you want to permanently delete workspace ${workspaceId}? This will delete the workspace and all its subcollections.`)) {
+      return;
+    }
+    try {
+      const subs = await getDocs(collection(firestore, "workspaces", workspaceId, "subsidiaries"));
+      for (const d of subs.docs) await deleteDoc(d.ref);
+
+      const depts = await getDocs(collection(firestore, "workspaces", workspaceId, "departments"));
+      for (const d of depts.docs) await deleteDoc(d.ref);
+
+      const tms = await getDocs(collection(firestore, "workspaces", workspaceId, "teams"));
+      for (const d of tms.docs) await deleteDoc(d.ref);
+
+      const mems = await getDocs(collection(firestore, "workspaces", workspaceId, "members"));
+      for (const d of mems.docs) await deleteDoc(d.ref);
+
+      const rls = await getDocs(collection(firestore, "workspaces", workspaceId, "roles"));
+      for (const d of rls.docs) await deleteDoc(d.ref);
+
+      await deleteDoc(doc(firestore, "workspaces", workspaceId));
+
+      toast({
+        title: "Workspace Purged",
+        description: `Successfully deleted workspace ${workspaceId}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to delete workspace",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateUserProfile = async () => {
+    if (!firestore || !newUserEmail || !newUserFirstName) return;
+    const uid = `user_${Math.random().toString(36).substring(2, 11)}`;
+    const userRef = doc(firestore, "users", uid);
+    try {
+      await setDoc(userRef, {
+        id: uid,
+        firstName: newUserFirstName,
+        lastName: newUserLastName || "",
+        email: newUserEmail,
+        role: newUserGlobalRole || "Team Member",
+        currentWorkspaceId: newUserWorkspaceId || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      if (newUserWorkspaceId) {
+        const memberRef = doc(firestore, "workspaces", newUserWorkspaceId, "members", uid);
+        await setDoc(memberRef, {
+          id: uid,
+          workspaceId: newUserWorkspaceId,
+          userId: uid,
+          role: newUserGlobalRole === "Admin" ? "Admin" : "Team Member",
+          roles: ["role_standard_rep"],
+          email: newUserEmail,
+          firstName: newUserFirstName,
+          lastName: newUserLastName || "",
+          joinedAt: serverTimestamp()
+        });
+      }
+
+      toast({
+        title: "User Created",
+        description: `Successfully created user profile for ${newUserFirstName}.`,
+      });
+      setNewUserFirstName("");
+      setNewUserLastName("");
+      setNewUserEmail("");
+      setNewUserWorkspaceId("");
+      setIsAddUserOpen(false);
+    } catch (e: any) {
+      toast({
+        title: "Failed to create user",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteUserProfile = async (userId: string, workspaceId: string) => {
+    if (!firestore || !userId) return;
+    if (userId === user?.uid) {
+      toast({
+        title: "Action Denied",
+        description: "You cannot delete your own account.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!confirm(`Are you sure you want to permanently delete user ${userId}? This will remove their user profile.`)) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(firestore, "users", userId));
+
+      if (workspaceId) {
+        await deleteDoc(doc(firestore, "workspaces", workspaceId, "members", userId));
+      } else {
+        const workspacesSnap = await getDocs(collection(firestore, "workspaces"));
+        for (const wsDoc of workspacesSnap.docs) {
+          const memberRef = doc(firestore, "workspaces", wsDoc.id, "members", userId);
+          await deleteDoc(memberRef).catch(() => {});
+        }
+      }
+
+      toast({
+        title: "User Deleted",
+        description: "Successfully deleted user profile.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to delete user",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateUserPermissions = async () => {
+    if (!firestore || !selectedUserPerms) return;
+    try {
+      const userRef = doc(firestore, "users", selectedUserPerms.id);
+      await setDoc(userRef, { 
+        role: userPermsGlobalRole,
+        currentWorkspaceId: userPermsWorkspaceId
+      }, { merge: true });
+
+      if (userPermsWorkspaceId) {
+        const memberRef = doc(firestore, "workspaces", userPermsWorkspaceId, "members", selectedUserPerms.id);
+        await setDoc(memberRef, { 
+          role: userPermsWorkspaceRole, 
+          roles: userPermsCustomRoles 
+        }, { merge: true });
+      }
+
+      toast({
+        title: "Permissions Saved",
+        description: "Successfully updated system and workspace-level roles.",
+      });
+      setIsEditPermissionsOpen(false);
+      setSelectedUserPerms(null);
+    } catch (e: any) {
+      toast({
+        title: "Failed to save permissions",
+        description: e.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   // Corporate Hierarchy States
   const [newSubsidiaryName, setNewSubsidiaryName] = useState("");
   const [editingSubsidiary, setEditingSubsidiary] = useState<any>(null);
@@ -1140,7 +1460,7 @@ export default function AdminPage() {
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Main Controls: Tabs for User Management & Roles/Permissions */}
-          <Tabs defaultValue="users" className="lg:col-span-2 space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className={`${activeTab === "saas" ? "lg:col-span-3" : "lg:col-span-2"} space-y-6`}>
             <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} bg-secondary/10 h-auto gap-2 p-2 rounded-xl`}>
               <TabsTrigger value="users" className="gap-2 text-xs py-2">
                 <Users className="w-4 h-4" /> Users Directory
@@ -1694,29 +2014,43 @@ export default function AdminPage() {
                           View all workspaces in the SaaS system and switch contexts to inspect their data.
                         </CardDescription>
                       </div>
-                      <div className="w-full md:w-72 relative">
-                        <Input
-                          placeholder="Search workspaces..."
-                          value={workspaceSearch}
-                          onChange={(e) => setWorkspaceSearch(e.target.value)}
-                          className="bg-white/50 text-xs pl-8"
-                        />
-                        <span className="absolute left-2.5 top-2.5 text-muted-foreground">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="w-4 h-4"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                            />
-                          </svg>
-                        </span>
+                      <div className="flex gap-2 items-center w-full md:w-auto">
+                        <div className="relative flex-1 md:w-72">
+                          <Input
+                            placeholder="Search workspaces..."
+                            value={workspaceSearch}
+                            onChange={(e) => setWorkspaceSearch(e.target.value)}
+                            className="bg-white/50 text-xs pl-8 h-9"
+                          />
+                          <span className="absolute left-2.5 top-2.5 text-muted-foreground">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              strokeWidth={1.5}
+                              stroke="currentColor"
+                              className="w-4 h-4"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                              />
+                            </svg>
+                          </span>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="gap-1.5 text-xs font-bold uppercase tracking-wider h-9 shrink-0"
+                          onClick={() => {
+                            setNewWorkspaceName("");
+                            setNewWorkspacePlan("free");
+                            setNewWorkspaceOwner("");
+                            setIsAddWorkspaceOpen(true);
+                          }}
+                        >
+                          <Plus className="w-4 h-4" /> Add Workspace
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
@@ -1730,7 +2064,7 @@ export default function AdminPage() {
                         No workspaces found matching the query.
                       </div>
                     ) : (
-                      <div className="border rounded-xl overflow-hidden bg-white/50 backdrop-blur-sm">
+                      <div className="border rounded-xl overflow-x-auto bg-white/50 backdrop-blur-sm">
                         <Table>
                           <TableHeader className="bg-secondary/5">
                             <TableRow>
@@ -1763,24 +2097,35 @@ export default function AdminPage() {
                                   </TableCell>
                                   <TableCell className="text-xs text-muted-foreground font-mono">{ws.ownerId || "N/A"}</TableCell>
                                   <TableCell className="text-right">
-                                    {isCurrent ? (
-                                      <Badge variant="secondary" className="text-[10px] font-bold bg-green-500/10 text-green-600 border-green-500/20 px-3 py-1">
-                                        Current Context
-                                      </Badge>
-                                    ) : (
+                                    <div className="flex justify-end gap-2 items-center">
+                                      {isCurrent ? (
+                                        <Badge variant="secondary" className="text-[10px] font-bold bg-green-500/10 text-green-600 border-green-500/20 px-3 py-1">
+                                          Current Context
+                                        </Badge>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 text-xs font-bold bg-white text-primary hover:bg-primary/5 border-primary/20"
+                                          disabled={switchingWorkspaceId !== null}
+                                          onClick={() => handleSwitchWorkspace(ws.id)}
+                                        >
+                                          {switchingWorkspaceId === ws.id ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                          ) : null}
+                                          Inspect
+                                        </Button>
+                                      )}
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 text-xs font-bold bg-white text-primary hover:bg-primary/5 border-primary/20"
-                                        disabled={switchingWorkspaceId !== null}
-                                        onClick={() => handleSwitchWorkspace(ws.id)}
+                                        disabled={isCurrent}
+                                        className="h-8 text-xs font-bold text-destructive border-destructive/20 hover:bg-destructive/5"
+                                        onClick={() => handleDeleteWorkspace(ws.id)}
                                       >
-                                        {switchingWorkspaceId === ws.id ? (
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                                        ) : null}
-                                        Inspect
+                                        Delete
                                       </Button>
-                                    )}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -1805,29 +2150,45 @@ export default function AdminPage() {
                           Manage all registered users, their global access roles, and inspect their active workspaces.
                         </CardDescription>
                       </div>
-                      <div className="w-full md:w-72 relative">
-                        <Input
-                          placeholder="Search users..."
-                          value={userSearch}
-                          onChange={(e) => setUserSearch(e.target.value)}
-                          className="bg-white/50 text-xs pl-8"
-                        />
-                        <span className="absolute left-2.5 top-2.5 text-muted-foreground">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="w-4 h-4"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                            />
-                          </svg>
-                        </span>
+                      <div className="flex gap-2 items-center w-full md:w-auto">
+                        <div className="relative flex-1 md:w-72">
+                          <Input
+                            placeholder="Search users..."
+                            value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)}
+                            className="bg-white/50 text-xs pl-8 h-9"
+                          />
+                          <span className="absolute left-2.5 top-2.5 text-muted-foreground">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              strokeWidth={1.5}
+                              stroke="currentColor"
+                              className="w-4 h-4"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                              />
+                            </svg>
+                          </span>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="gap-1.5 text-xs font-bold uppercase tracking-wider h-9 shrink-0"
+                          onClick={() => {
+                            setNewUserFirstName("");
+                            setNewUserLastName("");
+                            setNewUserEmail("");
+                            setNewUserGlobalRole("Team Member");
+                            setNewUserWorkspaceId(globalWorkspaces?.[0]?.id || "");
+                            setIsAddUserOpen(true);
+                          }}
+                        >
+                          <Plus className="w-4 h-4" /> Add User
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
@@ -1841,7 +2202,7 @@ export default function AdminPage() {
                         No users found matching the query.
                       </div>
                     ) : (
-                      <div className="border rounded-xl overflow-hidden bg-white/50 backdrop-blur-sm">
+                      <div className="border rounded-xl overflow-x-auto bg-white/50 backdrop-blur-sm">
                         <Table>
                           <TableHeader className="bg-secondary/5">
                             <TableRow>
@@ -1867,37 +2228,44 @@ export default function AdminPage() {
                                 </TableCell>
                                 <TableCell className="text-xs font-medium text-muted-foreground">{u.email}</TableCell>
                                 <TableCell>
-                                  <Select
-                                    disabled={updatingGlobalRole === u.id || u.id === user?.uid}
-                                    value={u.role || "Team Member"}
-                                    onValueChange={(v) => handleGlobalRoleChange(u.id, v)}
-                                  >
-                                    <SelectTrigger className="w-[120px] h-8 text-xs bg-white">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Admin">Admin</SelectItem>
-                                      <SelectItem value="Team Member">Team Member</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <Badge variant={u.role === "Admin" ? "destructive" : "outline"} className="text-[10px] font-bold">
+                                    {u.role || "Team Member"}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell className="text-xs font-mono text-muted-foreground">
                                   {u.currentWorkspaceId || "None"}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {u.currentWorkspaceId && u.currentWorkspaceId !== profile?.currentWorkspaceId ? (
+                                  <div className="flex justify-end gap-2 items-center">
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-8 text-xs font-bold bg-white text-accent hover:bg-accent/5 border-accent/20"
-                                      disabled={switchingWorkspaceId !== null}
-                                      onClick={() => handleSwitchWorkspace(u.currentWorkspaceId)}
+                                      className="h-8 text-xs font-bold bg-white text-primary hover:bg-primary/5 border-primary/20"
+                                      onClick={() => handleOpenEditPermissions(u)}
                                     >
-                                      Inspect Workspace
+                                      Edit Permissions
                                     </Button>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">None / Active</span>
-                                  )}
+                                    {u.currentWorkspaceId && u.currentWorkspaceId !== profile?.currentWorkspaceId ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 text-xs font-bold bg-white text-accent hover:bg-accent/5 border-accent/20"
+                                        disabled={switchingWorkspaceId !== null}
+                                        onClick={() => handleSwitchWorkspace(u.currentWorkspaceId)}
+                                      >
+                                        Inspect
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={u.id === user?.uid}
+                                      className="h-8 text-xs font-bold text-destructive border-destructive/20 hover:bg-destructive/5"
+                                      onClick={() => handleDeleteUserProfile(u.id, u.currentWorkspaceId)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -2502,73 +2870,330 @@ export default function AdminPage() {
             </DialogContent>
           </Dialog>
 
+          {/* Add Workspace Dialog */}
+          <Dialog open={isAddWorkspaceOpen} onOpenChange={setIsAddWorkspaceOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Add Workspace</DialogTitle>
+                <DialogDescription>Create a new global workspace inside the SaaS system.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-ws-name">Workspace Name</Label>
+                  <Input 
+                    id="create-ws-name"
+                    placeholder="e.g. Acme Corp"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-ws-plan">Billing Plan</Label>
+                  <Select value={newWorkspacePlan} onValueChange={setNewWorkspacePlan}>
+                    <SelectTrigger id="create-ws-plan" className="bg-white">
+                      <SelectValue placeholder="Select Plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="free">Free Trial</SelectItem>
+                      <SelectItem value="pro">Pro Plan</SelectItem>
+                      <SelectItem value="enterprise">Enterprise Plan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-ws-owner">Owner User (Optional)</Label>
+                  <Select value={newWorkspaceOwner} onValueChange={setNewWorkspaceOwner}>
+                    <SelectTrigger id="create-ws-owner" className="bg-white">
+                      <SelectValue placeholder="Select Owner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No Owner (Unassigned)</SelectItem>
+                      {globalUsers?.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName} ({u.email || u.id})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsAddWorkspaceOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!newWorkspaceName}
+                  onClick={handleCreateWorkspace}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Create Workspace
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add User Dialog */}
+          <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+            <DialogContent className="sm:max-w-[425px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Add User</DialogTitle>
+                <DialogDescription>Register a new user profile on the platform.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-user-firstname">First Name</Label>
+                  <Input 
+                    id="create-user-firstname"
+                    placeholder="e.g. John"
+                    value={newUserFirstName}
+                    onChange={(e) => setNewUserFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-user-lastname">Last Name</Label>
+                  <Input 
+                    id="create-user-lastname"
+                    placeholder="e.g. Doe"
+                    value={newUserLastName}
+                    onChange={(e) => setNewUserLastName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-user-email">Email Address</Label>
+                  <Input 
+                    id="create-user-email"
+                    type="email"
+                    placeholder="e.g. john.doe@company.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-user-globalrole">Global SaaS Role</Label>
+                  <Select value={newUserGlobalRole} onValueChange={setNewUserGlobalRole}>
+                    <SelectTrigger id="create-user-globalrole" className="bg-white">
+                      <SelectValue placeholder="Select Global Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Admin">Admin (Super Admin)</SelectItem>
+                      <SelectItem value="Team Member">Team Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-user-ws">Current Workspace Context</Label>
+                  <Select value={newUserWorkspaceId} onValueChange={setNewUserWorkspaceId}>
+                    <SelectTrigger id="create-user-ws" className="bg-white">
+                      <SelectValue placeholder="Select Active Workspace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None (No Active Workspace)</SelectItem>
+                      {globalWorkspaces?.map((ws) => (
+                        <SelectItem key={ws.id} value={ws.id}>
+                          {ws.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsAddUserOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!newUserFirstName || !newUserEmail}
+                  onClick={handleCreateUserProfile}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Create User
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit User Permissions Dialog */}
+          <Dialog open={isEditPermissionsOpen} onOpenChange={setIsEditPermissionsOpen}>
+            <DialogContent className="sm:max-w-[500px] glass-card">
+              <DialogHeader>
+                <DialogTitle>Edit User Permissions</DialogTitle>
+                <DialogDescription>
+                  Modify roles and custom permissions for {selectedUserPerms?.firstName} {selectedUserPerms?.lastName}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-user-globalrole">Global SaaS Role</Label>
+                  <Select value={userPermsGlobalRole} onValueChange={setUserPermsGlobalRole}>
+                    <SelectTrigger id="edit-user-globalrole" className="bg-white">
+                      <SelectValue placeholder="Select Global Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Admin">Admin (Super Admin)</SelectItem>
+                      <SelectItem value="Team Member">Team Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-user-ws">Active Workspace Context</Label>
+                  <Select 
+                    value={userPermsWorkspaceId} 
+                    onValueChange={async (v) => {
+                      setUserPermsWorkspaceId(v);
+                      setUserPermsWorkspaceRole("Team Member");
+                      setUserPermsCustomRoles([]);
+                      await fetchWorkspaceRoles(v);
+                    }}
+                  >
+                    <SelectTrigger id="edit-user-ws" className="bg-white">
+                      <SelectValue placeholder="Select Workspace Context" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None (No Workspace Context)</SelectItem>
+                      {globalWorkspaces?.map((ws) => (
+                        <SelectItem key={ws.id} value={ws.id}>
+                          {ws.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {userPermsWorkspaceId && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-user-wsrole">Workspace System Role</Label>
+                      <Select value={userPermsWorkspaceRole} onValueChange={setUserPermsWorkspaceRole}>
+                        <SelectTrigger id="edit-user-wsrole" className="bg-white">
+                          <SelectValue placeholder="Select Workspace Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Workspace Admin</SelectItem>
+                          <SelectItem value="Team Member">Workspace Team Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Workspace Custom Roles</Label>
+                      {loadingWorkspaceRoles ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" /> Loading custom roles...
+                        </div>
+                      ) : userPermsCustomRolesList && userPermsCustomRolesList.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2 max-h-[150px] overflow-y-auto pr-2 border rounded-xl p-3 bg-secondary/5">
+                          {userPermsCustomRolesList.map((role) => {
+                            const isChecked = userPermsCustomRoles.includes(role.id);
+                            return (
+                              <div key={role.id} className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id={`edit-user-customrole-${role.id}`}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setUserPermsCustomRoles([...userPermsCustomRoles, role.id]);
+                                    } else {
+                                      setUserPermsCustomRoles(userPermsCustomRoles.filter((id) => id !== role.id));
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`edit-user-customrole-${role.id}`} className="text-xs cursor-pointer font-medium">
+                                  {role.name}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic py-1">No custom roles defined in this workspace.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsEditPermissionsOpen(false)} className="text-xs font-bold uppercase">
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdateUserPermissions}
+                  className="text-xs font-bold uppercase tracking-wider"
+                >
+                  Save Permissions
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Database Tools Sidebar */}
-          <div className="space-y-6">
-            <Card className="glass-card border-accent/20">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Database className="w-5 h-5 text-accent" />
-                  Database Tools
-                </CardTitle>
-                <CardDescription>Seed demo configurations or reset the active workspace data.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-bold">Populate Demo Sandbox</h4>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                        Fills this workspace with 3 companies, 4 contacts, 5 pipeline deals, 2 projects, 5 tasks, checklists, and 3 logged times.
-                      </p>
+          {activeTab !== "saas" && (
+            <div className="space-y-6">
+              <Card className="glass-card border-accent/20">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Database className="w-5 h-5 text-accent" />
+                    Database Tools
+                  </CardTitle>
+                  <CardDescription>Seed demo configurations or reset the active workspace data.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold">Populate Demo Sandbox</h4>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                          Fills this workspace with 3 companies, 4 contacts, 5 pipeline deals, 2 projects, 5 tasks, checklists, and 3 logged times.
+                        </p>
+                      </div>
                     </div>
+                    <Button 
+                      disabled={seeding || clearing} 
+                      onClick={handleSeedData}
+                      className="w-full gap-2 text-xs font-bold uppercase tracking-widest bg-primary"
+                    >
+                      {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                      Seed Workspace
+                    </Button>
                   </div>
-                  <Button 
-                    disabled={seeding || clearing} 
-                    onClick={handleSeedData}
-                    className="w-full gap-2 text-xs font-bold uppercase tracking-widest bg-primary"
-                  >
-                    {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                    Seed Workspace
-                  </Button>
-                </div>
 
-                <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-bold text-destructive">Wipe Operational Data</h4>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                        Deletes all projects, tasks, deals, contacts, companies, pipelines, and logged times. This cannot be undone.
-                      </p>
+                  <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/10 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold text-destructive">Wipe Operational Data</h4>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                          Deletes all projects, tasks, deals, contacts, companies, pipelines, and logged times. This cannot be undone.
+                        </p>
+                      </div>
                     </div>
+                    <Button 
+                      variant="outline"
+                      disabled={seeding || clearing} 
+                      onClick={handleClearData}
+                      className="w-full gap-2 text-xs font-bold uppercase tracking-widest text-destructive hover:bg-destructive/5 border-destructive/20"
+                    >
+                      {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      Clear Workspace
+                    </Button>
                   </div>
-                  <Button 
-                    variant="outline"
-                    disabled={seeding || clearing} 
-                    onClick={handleClearData}
-                    className="w-full gap-2 text-xs font-bold uppercase tracking-widest text-destructive hover:bg-destructive/5 border-destructive/20"
-                  >
-                    {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    Clear Workspace
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">System Integrity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-xs font-medium">
-                  <span>Connection Mode</span>
-                  <Badge variant="outline" className="text-green-500 bg-green-500/5 uppercase border-green-500/20 text-[9px] font-bold">Realtime Sync</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">System Integrity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span>Connection Mode</span>
+                    <Badge variant="outline" className="text-green-500 bg-green-500/5 uppercase border-green-500/20 text-[9px] font-bold">Realtime Sync</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </AppShell>
