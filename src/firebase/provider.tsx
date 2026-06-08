@@ -3,8 +3,8 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, onSnapshot } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
+import { Firestore, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Auth, User, onIdTokenChanged, getIdTokenResult, IdTokenResult } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -72,56 +72,187 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [idTokenResult, setIdTokenResultState] = useState<IdTokenResult | null>(null);
 
-  // 1. Handle Auth State Changes
+  // 1. Handle Auth State Changes using onIdTokenChanged (picks up token refreshes for claims)
   useEffect(() => {
     if (!auth) {
       setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
       return;
     }
 
-    const unsubscribeAuth = onAuthStateChanged(
+    const unsubscribe = onIdTokenChanged(
       auth,
-      (user) => {
+      async (user) => {
         setCurrentUser(user);
-        if (!user) {
+        if (user) {
+          try {
+            const tokenResult = await getIdTokenResult(user);
+            setIdTokenResultState(tokenResult);
+          } catch (err) {
+            console.error("FirebaseProvider: Error fetching token result in onIdTokenChanged:", err);
+          }
+        } else {
+          setIdTokenResultState(null);
           setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: null });
         }
       },
       (error) => {
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
+        console.error("FirebaseProvider: onIdTokenChanged error:", error);
         setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: error }));
       }
     );
-    return () => unsubscribeAuth();
+    return () => unsubscribe();
   }, [auth]);
 
-  // 2. Handle Profile Listener (Decoupled to fix leaked snapshot listeners)
+  // 2. Handle Profile Listener (Decoupled and synced with custom claims)
   useEffect(() => {
-    if (!currentUser || !firestore) return;
+    if (!currentUser || !firestore || !idTokenResult) return;
 
     setUserAuthState(prev => ({ ...prev, isUserLoading: true }));
 
     let unsubscribeProfile: () => void = () => {};
+    let isInitializing = false;
 
     const resolveProfile = async () => {
       try {
-        // Fetch custom claims for role resolution
-        const tokenResult = await getIdTokenResult(currentUser);
-        const claimsRole = tokenResult.claims.role;
+        const claimsRole = idTokenResult.claims.role;
+        const workspaceId = idTokenResult.claims.workspaceId;
+        const permissions = idTokenResult.claims.permissions;
 
         const userDocRef = doc(firestore, "users", currentUser.uid);
         
         // Return unsubscribe to effect cleanup
-        unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
-          const profileData = docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } : null;
-          
-          setUserAuthState({
-            user: currentUser,
-            profile: profileData ? { ...profileData, role: claimsRole || profileData.role } : null,
-            isUserLoading: false,
-            userError: null,
-          });
+        unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
+          if (!docSnap.exists()) {
+            if (isInitializing) return;
+            isInitializing = true;
+            console.log(`User profile for ${currentUser.uid} does not exist. Initializing...`);
+            try {
+              // Initialize user profile
+              const fallbackWorkspaceId = `ws-${currentUser.uid}`;
+              const workspaceRef = doc(firestore, "workspaces", fallbackWorkspaceId);
+              
+              const email = currentUser.email || "";
+              const emailPrefix = email.split('@')[0] || "User";
+              const firstName = currentUser.displayName?.split(' ')[0] || emailPrefix;
+              const lastName = currentUser.displayName?.split(' ').slice(1).join(' ') || "";
+              
+              // 1. Create Workspace
+              await setDoc(workspaceRef, {
+                id: fallbackWorkspaceId,
+                name: `${firstName}'s Workspace`,
+                slug: `${emailPrefix.toLowerCase().replace(/[^a-z0-9]/g, '-')}-workspace`,
+                planType: "pro",
+                ownerId: currentUser.uid,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+
+              // Seed default roles out-of-the-box
+              const adminRoleRef = doc(firestore, "workspaces", fallbackWorkspaceId, "roles", "role_workspace_administrator");
+              await setDoc(adminRoleRef, {
+                id: "role_workspace_administrator",
+                name: "Workspace Administrator",
+                permissions: [
+                  "crm:read", "crm:create", "crm:update", "crm:delete",
+                  "projects:read", "projects:create", "projects:update", "projects:delete",
+                  "tasks:create", "tasks:update", "tasks:delete",
+                  "settings:read", "settings:write"
+                ],
+                createdAt: serverTimestamp()
+              });
+
+              const salesManagerRoleRef = doc(firestore, "workspaces", fallbackWorkspaceId, "roles", "role_sales_manager");
+              await setDoc(salesManagerRoleRef, {
+                id: "role_sales_manager",
+                name: "Sales Manager",
+                permissions: [
+                  "crm:read", "crm:create", "crm:update", "crm:delete",
+                  "projects:read", "projects:create", "projects:update",
+                  "tasks:create", "tasks:update"
+                ],
+                createdAt: serverTimestamp()
+              });
+
+              const standardRepRoleRef = doc(firestore, "workspaces", fallbackWorkspaceId, "roles", "role_standard_rep");
+              await setDoc(standardRepRoleRef, {
+                id: "role_standard_rep",
+                name: "Standard Executive Account Representative",
+                permissions: [
+                  "crm:read", "crm:create", "crm:update",
+                  "projects:read",
+                  "tasks:create", "tasks:update"
+                ],
+                createdAt: serverTimestamp()
+              });
+
+              // 2. Create Workspace Membership
+              const memberRef = doc(firestore, "workspaces", fallbackWorkspaceId, "members", currentUser.uid);
+              const isAdminEmail = email === "nidhal.shaikh@gmail.com";
+              await setDoc(memberRef, {
+                id: currentUser.uid,
+                workspaceId: fallbackWorkspaceId,
+                userId: currentUser.uid,
+                role: isAdminEmail ? "Admin" : "owner",
+                roles: ["role_workspace_administrator"],
+                email,
+                firstName,
+                lastName,
+                joinedAt: serverTimestamp()
+              });
+
+              // 3. Create User Profile Document (triggers this listener again)
+              await setDoc(userDocRef, {
+                id: currentUser.uid,
+                firstName,
+                lastName,
+                email,
+                role: isAdminEmail ? "Admin" : "Team Member",
+                currentWorkspaceId: fallbackWorkspaceId,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+
+              console.log(`Successfully initialized user profile and workspace for UID: ${currentUser.uid}`);
+
+              // 4. Register Session & Custom Claims on Server-side
+              const idToken = await currentUser.getIdToken();
+              const sessionResponse = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
+              });
+
+              if (sessionResponse.ok) {
+                // Force token refresh to apply newly registered claims
+                await currentUser.getIdToken(true);
+              }
+            } catch (err: any) {
+              console.error("Failed to initialize user profile:", err);
+              isInitializing = false;
+              setUserAuthState({
+                user: currentUser,
+                profile: null,
+                isUserLoading: false,
+                userError: err,
+              });
+            }
+          } else {
+            const profileData = { ...docSnap.data(), id: docSnap.id } as any;
+            
+            setUserAuthState({
+              user: currentUser,
+              profile: { 
+                ...profileData, 
+                role: claimsRole || profileData.role,
+                currentWorkspaceId: workspaceId || profileData.currentWorkspaceId,
+                permissions: permissions || []
+              },
+              isUserLoading: false,
+              userError: null,
+            });
+          }
         }, (err) => {
           console.error("Profile snapshot error:", err);
           setUserAuthState(prev => ({ ...prev, isUserLoading: false }));
@@ -137,7 +268,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     return () => {
       if (unsubscribeProfile) unsubscribeProfile();
     };
-  }, [currentUser, firestore]);
+  }, [currentUser, firestore, idTokenResult]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth && storage);

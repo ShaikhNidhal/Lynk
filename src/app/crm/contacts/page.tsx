@@ -13,10 +13,13 @@ import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { CreateContactDialog } from "@/components/crm/create-contact-dialog";
+import { usePermission } from "@/hooks/use-permission";
 
 export default function ContactsPage() {
   const { firestore, profile } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
+  // Bug #9 fix: guard create action by permission
+  const canCreate = usePermission("crm:create");
 
   const contactsQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
@@ -50,7 +53,7 @@ export default function ContactsPage() {
             </h1>
             <p className="text-muted-foreground mt-1">Manage individual stakeholders across all client accounts.</p>
           </div>
-          <CreateContactDialog />
+          {canCreate && <CreateContactDialog />}
         </div>
 
         <div className="relative max-w-md">
@@ -81,7 +84,7 @@ export default function ContactsPage() {
                           <Link href={`/crm/contacts/${contact.id}`} className="hover:text-primary transition-colors">
                             <h3 className="font-bold text-base">{contact.firstName} {contact.lastName}</h3>
                           </Link>
-                          {contact.isPrimary && <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" title="Primary Contact" />}
+                          {contact.isPrimary && <span title="Primary Contact"><Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" /></span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
                           <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> {contact.companyName || "Independent"}</span>
@@ -117,7 +120,7 @@ export default function ContactsPage() {
             <ContactIcon className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">No contacts found</h3>
             <p className="text-muted-foreground mb-4">Start mapping stakeholders to your client companies.</p>
-            <CreateContactDialog />
+            {canCreate && <CreateContactDialog />}
           </div>
         )}
       </div>

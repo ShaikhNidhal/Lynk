@@ -27,11 +27,14 @@ export function CreatePipelineDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
-  const [stages, setStages] = useState([
+
+  // Bug #3 fix: define default stages as a constant so we can reset to them
+  const defaultStages = [
     { id: "prospecting", name: "Prospecting", color: "bg-blue-500", probability: 20 },
     { id: "proposal", name: "Proposal", color: "bg-orange-500", probability: 50 },
     { id: "closed", name: "Closed Won", color: "bg-green-500", probability: 100 }
-  ]);
+  ];
+  const [stages, setStages] = useState(defaultStages);
 
   const addStage = () => {
     const id = `stage_${Math.random().toString(36).substr(2, 9)}`;
@@ -64,6 +67,8 @@ export function CreatePipelineDialog() {
       toast({ title: "Pipeline Created", description: `"${name}" is now available.` });
       setIsOpen(false);
       setName("");
+      // Bug #3 fix: reset stages back to defaults so dialog is clean on reopen
+      setStages(defaultStages);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {

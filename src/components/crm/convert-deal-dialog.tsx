@@ -41,7 +41,11 @@ export function ConvertDealDialog({ deal }: { deal: any }) {
       setDocumentNonBlocking(projectRef, {
         id: projectId,
         name: projectName,
+        // Bug #5 fix: workspaceId was missing — project never appeared in workspace views
+        workspaceId: deal.workspaceId,
         companyId: deal.companyId,
+        // Bug #6 fix: companyName was missing — project detail pages use this for display
+        companyName: deal.companyName || "",
         dealId: deal.id,
         description: `Project initialized from Deal: ${deal.title}`,
         status: "Active",

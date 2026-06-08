@@ -23,7 +23,8 @@ import {
   Target,
   Zap,
   BarChart2,
-  Contact as ContactIcon
+  Contact as ContactIcon,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { doc } from "firebase/firestore";
+import { usePermission } from "@/hooks/use-permission";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -68,6 +70,10 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   const handleLogout = async () => {
     const { auth } = await import("@/firebase").then(m => m.initializeFirebase());
     await signOut(auth);
+    // Clear HttpOnly session cookie on the server
+    await fetch('/api/auth/logout', { method: 'POST' }).catch((err) => {
+      console.error("Shell: Failed to clear session cookie during logout:", err);
+    });
     router.push("/login");
   };
 
@@ -79,6 +85,10 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
   const isAdmin = role === 'Admin';
   const isManager = role === 'Project Manager';
   const isClient = role === 'Client';
+
+  // Granular access checks
+  const canReadCRM = usePermission('crm:read');
+  const canReadProjects = usePermission('projects:read');
 
   return (
     <div className="flex flex-col h-full">
@@ -92,7 +102,7 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
       <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
         <NavItem icon={<LayoutDashboard />} label="Dashboard" href="/dashboard" open={open} onClick={onItemClick} />
         
-        {(isAdmin || isManager) && (
+        {canReadCRM && (
           <Collapsible open={crmOpen && open} onOpenChange={setCrmOpen} className="w-full">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className={cn("w-full justify-between px-3 py-2.5 h-auto text-muted-foreground hover:text-primary", !open && "justify-center")}>
@@ -112,9 +122,11 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
           </Collapsible>
         )}
 
-        <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
+        {canReadProjects && (
+          <NavItem icon={<FolderKanban />} label="Projects" href="/projects" open={open} onClick={onItemClick} />
+        )}
         
-        {!isClient && (
+        {!isClient && canReadProjects && (
           <NavItem icon={<Clock />} label="Time Tracking" href="/time" open={open} onClick={onItemClick} />
         )}
         
@@ -138,6 +150,10 @@ const NavContent = ({ open, setMobileOpen }: { open: boolean, setMobileOpen?: (o
 
         {(isAdmin || isManager) && (
           <NavItem icon={<Handshake />} label="Client Portal" href="/clients" open={open} onClick={onItemClick} />
+        )}
+
+        {isAdmin && (
+          <NavItem icon={<Shield />} label="Admin Panel" href="/admin" open={open} onClick={onItemClick} />
         )}
         
         <div className="pt-4 mt-4 border-t border-border">
@@ -193,7 +209,7 @@ const NavItem = ({ icon, label, href, open, onClick, sub }: { icon: React.ReactN
       )}
     >
       <div className={cn("shrink-0 transition-all", active ? "text-white" : "text-muted-foreground group-hover:text-primary")}>
-        {React.cloneElement(icon as React.ReactElement, { className: sub ? "w-4 h-4" : "w-5 h-5" })}
+        {React.cloneElement(icon as React.ReactElement<any>, { className: sub ? "w-4 h-4" : "w-5 h-5" })}
       </div>
       {open && <span className={cn("font-semibold whitespace-nowrap", sub ? "text-xs" : "text-sm")}>{label}</span>}
       {active && open && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}

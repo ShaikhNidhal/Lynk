@@ -57,7 +57,7 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
  * Does NOT await the write operation internally.
  */
 export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) {
-  updateDoc(docRef, data)
+  setDoc(docRef, data, { merge: true })
     .catch(error => {
       errorEmitter.emit(
         'permission-error',

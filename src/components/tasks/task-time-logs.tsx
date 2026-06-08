@@ -11,7 +11,8 @@ import {
   StopCircle, 
   Clock,
   Trash2,
-  Pause
+  Pause,
+  Check
 } from "lucide-react";
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, orderBy, limit } from "firebase/firestore";
@@ -190,7 +191,7 @@ export function TaskTimeLogs({ projectId, taskId, projectMembers }: TaskTimeLogs
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1 text-[10px] font-bold uppercase" onClick={() => setIsAdding(false)}>Cancel</Button>
             <Button className="flex-1 text-[10px] font-bold uppercase gap-2" onClick={handleManualAdd} disabled={!manualDuration || isSubmitting}>
-              {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save Log
+              {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Save Log
             </Button>
           </div>
         </div>

@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LineChart, Plus, Loader2, DollarSign, Calendar, TrendingUp, Settings2, MoreHorizontal, ArrowRightLeft } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
+import { usePermission } from "@/hooks/use-permission";
 import { collection, query, orderBy, serverTimestamp, doc, where } from "firebase/firestore";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useState, useMemo } from "react";
 import { CreateDealDialog } from "@/components/crm/create-deal-dialog";
 import { CreatePipelineDialog } from "@/components/crm/create-pipeline-dialog";
 import { ConvertDealDialog } from "@/components/crm/convert-deal-dialog";
+import { DealDetailSheet } from "@/components/crm/deal-detail-sheet";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +23,23 @@ export default function PipelinePage() {
   const { firestore, profile } = useFirebase();
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string>("default");
+
+  const canCreate = usePermission("crm:create");
+  const canUpdate = usePermission("crm:update");
+  
+  // States for Deal Detail Sheet
+  const [selectedDeal, setSelectedDeal] = useState<any | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Fetch companies for linked company selection
+  const companiesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "companies"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: companies } = useCollection(companiesQuery);
 
   // 1. Fetch all pipelines for the current workspace
   const pipelinesQuery = useMemoFirebase(() => {
@@ -108,8 +127,8 @@ export default function PipelinePage() {
                 {pipelines?.length === 0 && <SelectItem value="default" disabled>No Pipelines Found</SelectItem>}
               </SelectContent>
             </Select>
-            <CreatePipelineDialog />
-            <CreateDealDialog initialPipelineId={activePipeline?.id} />
+            {canCreate && <CreatePipelineDialog />}
+            {canCreate && <CreateDealDialog initialPipelineId={activePipeline?.id} />}
           </div>
         </div>
 
@@ -141,39 +160,54 @@ export default function PipelinePage() {
                       key={deal.id} 
                       deal={deal} 
                       onDragStart={() => handleDragStart(deal.id)} 
+                      onClick={() => {
+                        setSelectedDeal(deal);
+                        setIsDetailOpen(true);
+                      }}
                     />
                   ))}
-                  <CreateDealDialog 
-                    initialPipelineId={activePipeline?.id}
-                    initialStageId={column.id}
-                    trigger={
-                      <Button variant="ghost" className="w-full border-2 border-dashed py-10 opacity-40 hover:opacity-100 hover:bg-white text-xs font-bold uppercase gap-2">
-                        <Plus className="w-4 h-4" /> Add Deal
-                      </Button>
-                    }
-                  />
+                  {canCreate && (
+                    <CreateDealDialog 
+                      initialPipelineId={activePipeline?.id}
+                      initialStageId={column.id}
+                      trigger={
+                        <Button variant="ghost" className="w-full border-2 border-dashed py-10 opacity-40 hover:opacity-100 hover:bg-white text-xs font-bold uppercase gap-2">
+                          <Plus className="w-4 h-4" /> Add Deal
+                        </Button>
+                      }
+                    />
+                  )}
                 </div>
               </div>
             ))
           )}
         </div>
+
+        <DealDetailSheet 
+          isOpen={isDetailOpen} 
+          onOpenChange={setIsDetailOpen} 
+          deal={selectedDeal}
+          pipelineStages={activePipeline?.stages || []}
+          companies={companies || []}
+        />
       </div>
     </AppShell>
   );
 }
 
-function DealCard({ deal, onDragStart }: { deal: any, onDragStart: () => void }) {
+function DealCard({ deal, onDragStart, onClick }: { deal: any, onDragStart: () => void, onClick: () => void }) {
   return (
     <Card 
       draggable 
       onDragStart={onDragStart}
-      className="p-4 cursor-grab active:cursor-grabbing hover:border-primary/50 transition-all group bg-white shadow-sm relative"
+      onClick={onClick}
+      className="p-4 cursor-grab active:cursor-grabbing hover:border-primary/50 cursor-pointer transition-all group bg-white shadow-sm relative"
     >
       <div className="flex items-start justify-between mb-2">
         <Badge variant="outline" className="text-[9px] font-bold uppercase py-0 px-1.5 border-primary/20">
           {deal.companyName || "No Company"}
         </Badge>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <span className="text-[10px] font-bold text-primary/60">{deal.probability}%</span>
           <ConvertDealDialog deal={deal} />
         </div>

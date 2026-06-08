@@ -43,3 +43,12 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# secrets and service accounts
+*-adminsdk-*.json
+*.json.local
+
+# local diagnostic and agent configs
+/scratch/
+/.agents/
+/.vscode/

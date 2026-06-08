@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useFirebase } from "@/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,62 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address first, then click 'Forgot Password?'.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Reset Link Sent",
+        description: `We've sent a password reset link to ${email}. Please check your inbox.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Could not send password reset link.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1. Sign in with Firebase Client SDK
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Retrieve the Firebase ID Token
+      const idToken = await user.getIdToken();
+
+      // 3. Call the server-side API to register session & set custom claims (JWT verification)
+      const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to set up secure session.");
+      }
+
+      // 4. Force-refresh the token on the client so that the custom claims take effect immediately
+      await user.getIdToken(true);
+
       router.push("/dashboard");
     } catch (error: any) {
       toast({
@@ -84,6 +134,13 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
+                <button 
+                  type="button" 
+                  onClick={handleForgotPassword}
+                  className="text-xs text-primary hover:underline font-semibold"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <Input 
                 id="password" 

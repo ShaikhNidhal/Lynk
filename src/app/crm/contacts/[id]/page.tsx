@@ -67,6 +67,21 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, contact?.companyId, profile?.currentWorkspaceId]);
   const { data: deals } = useCollection(dealsQuery);
 
+  // Bug #1 fix: fetch pipelines so we can resolve stageId → stage name
+  const pipelinesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "pipelines"), where("workspaceId", "==", profile.currentWorkspaceId));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: pipelines } = useCollection(pipelinesQuery);
+
+  const stageNameMap = useMemoFirebase(() => {
+    const map: Record<string, string> = {};
+    pipelines?.forEach((p: any) => {
+      p.stages?.forEach((s: any) => { map[s.id] = s.name; });
+    });
+    return map;
+  }, [pipelines]);
+
   const handleDelete = async () => {
     if (!contact || !firestore) return;
     if (!confirm(`Are you sure you want to remove ${contact.firstName}? This action cannot be undone.`)) return;
@@ -172,8 +187,11 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-bold text-foreground">{interaction.type} Record</p>
                                 <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                                  {interaction.date ? format(new Date(interaction.date), "MMM d, yyyy • h:mm a") : "Date unknown"}
-                                </p>
+                                {/* Bug #8 fix: safely parse date whether it's ISO string or Timestamp */}
+                                {interaction.date
+                                  ? (() => { try { return format(new Date(interaction.date), "MMM d, yyyy • h:mm a"); } catch { return "Date unknown"; } })()
+                                  : "Date unknown"}
+                              </p>
                               </div>
                               <p className="text-sm text-muted-foreground leading-relaxed italic">
                                 "{interaction.notes}"
@@ -239,7 +257,10 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                               <h4 className="font-bold text-sm group-hover:text-primary transition-colors">{deal.title}</h4>
                               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Value: ${(deal.value || 0).toLocaleString()}</p>
                             </div>
-                            <Badge variant="outline" className="text-[9px] uppercase">{deal.stage}</Badge>
+                            {/* Bug #1 fix: look up human-readable stage name via stageNameMap */}
+                            <Badge variant="outline" className="text-[9px] uppercase">
+                              {stageNameMap[deal.stageId] || deal.stageId || "Unknown"}
+                            </Badge>
                           </div>
                         ))
                       ) : <p className="text-sm text-muted-foreground italic text-center py-8">No active deals found for this account.</p>}
@@ -260,8 +281,11 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                 <div className="space-y-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last Interaction</span>
+                    {/* Bug #7 fix: guard against missing/pending date to prevent runtime crash */}
                     <span className="text-sm font-medium">
-                      {interactions?.[0] ? format(new Date(interactions[0].date), "MMM d, yyyy") : "Never contacted"}
+                      {interactions?.[0]?.date
+                        ? (() => { try { return format(new Date(interactions[0].date), "MMM d, yyyy"); } catch { return "Date unknown"; } })()
+                        : "Never contacted"}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">

@@ -43,6 +43,24 @@ export default function CRMDashboard() {
   }, [firestore, profile?.currentWorkspaceId]);
   const { data: deals, isLoading } = useCollection(dealsQuery);
 
+  // Bug #13 fix: fetch all pipelines to build a stageId → stage name lookup map
+  const pipelinesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(
+      collection(firestore, "pipelines"),
+      where("workspaceId", "==", profile.currentWorkspaceId)
+    );
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: pipelines } = useCollection(pipelinesQuery);
+
+  const stageNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    pipelines?.forEach((p: any) => {
+      p.stages?.forEach((s: any) => { map[s.id] = s.name; });
+    });
+    return map;
+  }, [pipelines]);
+
   const stats = useMemo(() => {
     if (!deals) return { totalValue: 0, winRate: 0, openCount: 0, weightedValue: 0 };
     
@@ -68,14 +86,16 @@ export default function CRMDashboard() {
 
   const pipelineData = useMemo(() => {
     if (!deals) return [];
-    // Stages breakdown
+    // Bug #13 fix: group by stage name (not raw stageId) using the lookup map
     const stages: Record<string, number> = {};
     deals.forEach(d => {
-      const stage = d.stageId || 'Unknown';
-      stages[stage] = (stages[stage] || 0) + (d.value || 0);
+      // Use the human-readable stage name if available, otherwise format the stageId
+      const stageName = stageNameMap[d.stageId]
+        || (d.stageId ? d.stageId.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'Unknown');
+      stages[stageName] = (stages[stageName] || 0) + (d.value || 0);
     });
     return Object.entries(stages).map(([name, value]) => ({ name, value }));
-  }, [deals]);
+  }, [deals, stageNameMap]);
 
   if (isLoading) {
     return (

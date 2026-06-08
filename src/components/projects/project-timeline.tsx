@@ -5,8 +5,9 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays } from "date-fns";
-import { Flag, ListTodo, Calendar, ChevronRight } from "lucide-react";
+import { Flag, ListTodo, Calendar, ChevronRight, Plus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 interface ProjectTimelineProps {
   projectId: string;

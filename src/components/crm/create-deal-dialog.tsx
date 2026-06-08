@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -54,6 +54,16 @@ export function CreateDealDialog({ initialPipelineId, initialStageId, trigger }:
     probability: "20",
     expectedCloseDate: ""
   });
+
+  // Bug #4 fix: resync pipelineId/stageId when the parent passes new props
+  // (e.g. clicking "Add Deal" in a different pipeline column)
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      pipelineId: initialPipelineId || "none",
+      stageId: initialStageId || "none",
+    }));
+  }, [initialPipelineId, initialStageId]);
 
   const activePipeline = pipelines?.find(p => p.id === formData.pipelineId);
 

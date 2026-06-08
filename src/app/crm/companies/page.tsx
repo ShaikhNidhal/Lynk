@@ -14,11 +14,14 @@ import { CreateCompanyDialog } from "@/components/crm/create-company-dialog";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePermission } from "@/hooks/use-permission";
 
 export default function CompaniesPage() {
   const { firestore, profile } = useFirebase();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Bug #9 fix: guard create action by permission
+  const canCreate = usePermission("crm:create");
 
   const companiesQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
@@ -53,7 +56,7 @@ export default function CompaniesPage() {
             </h1>
             <p className="text-muted-foreground mt-1">Manage client organizations and institutional relationships.</p>
           </div>
-          <CreateCompanyDialog />
+          {canCreate && <CreateCompanyDialog />}
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
@@ -139,7 +142,7 @@ export default function CompaniesPage() {
             <Building2 className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-foreground">No companies found</h3>
             <p className="text-muted-foreground mb-4">Start by adding your first client organization or adjust filters.</p>
-            <CreateCompanyDialog />
+            {canCreate && <CreateCompanyDialog />}
           </div>
         )}
       </div>

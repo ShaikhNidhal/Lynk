@@ -2,7 +2,7 @@
 
 import { AppShell } from "@/components/layout/shell";
 import { useFirebase, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, collection, query, where, orderBy, limit } from "firebase/firestore";
+import { doc, collection, query, where, orderBy, limit, setDoc, serverTimestamp } from "firebase/firestore";
 import { use, useState } from "react";
 import { 
   Building2, 
@@ -21,18 +21,26 @@ import {
   Loader2,
   ExternalLink,
   ShieldCheck,
-  Heart
+  Heart,
+  Save,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CreateContactDialog } from "@/components/crm/create-contact-dialog";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +49,11 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   const { firestore, profile } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
+
+  // Bug #11 fix: edit dialog state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   // 1. Fetch Company Data
   const companyRef = useMemoFirebase(() => {
@@ -71,7 +84,14 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: deals, isLoading: isDealsLoading } = useCollection(dealsQuery);
 
-  // 4. Fetch Projects - filtered by workspace
+  // 4. Fetch Pipelines for stage name lookup
+  const pipelinesQuery = useMemoFirebase(() => {
+    if (!firestore || !profile?.currentWorkspaceId) return null;
+    return query(collection(firestore, "pipelines"), where("workspaceId", "==", profile.currentWorkspaceId));
+  }, [firestore, profile?.currentWorkspaceId]);
+  const { data: pipelines } = useCollection(pipelinesQuery);
+
+  // 4b. Fetch Projects - filtered by workspace
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
     return query(
@@ -82,7 +102,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: projects, isLoading: isProjectsLoading } = useCollection(projectsQuery);
 
-  // 5. Fetch Activity Log - filtered by workspace (aligned path activity_logs)
+  // 5. Fetch Activity Log
   const activityQuery = useMemoFirebase(() => {
     if (!firestore || !companyId || !profile?.currentWorkspaceId) return null;
     return query(
@@ -95,6 +115,17 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }, [firestore, companyId, profile?.currentWorkspaceId]);
   const { data: activity, isLoading: isActivityLoading } = useCollection(activityQuery);
 
+  // Bug #1 fix: build a stage name lookup from all fetched pipelines
+  const stageNameMap = useMemoFirebase(() => {
+    const map: Record<string, string> = {};
+    pipelines?.forEach(p => {
+      p.stages?.forEach((s: any) => {
+        map[s.id] = s.name;
+      });
+    });
+    return map;
+  }, [pipelines]);
+
   const handleDelete = async () => {
     if (!company || !firestore) return;
     if (!confirm(`Are you sure you want to archive ${company.name}? This action cannot be undone.`)) return;
@@ -106,6 +137,48 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
+  };
+
+  // Bug #11 fix: save edited company profile
+  const handleSaveEdit = async () => {
+    if (!firestore || !editForm) return;
+    setSaving(true);
+    try {
+      await setDoc(doc(firestore, "companies", companyId), {
+        name: editForm.name,
+        industry: editForm.industry,
+        website: editForm.website,
+        status: editForm.status,
+        notes: editForm.notes,
+        address: {
+          street: editForm.street,
+          city: editForm.city,
+          state: editForm.state,
+        },
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast({ title: "Company Updated", description: "Profile saved successfully." });
+      setIsEditOpen(false);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditDialog = () => {
+    if (!company) return;
+    setEditForm({
+      name: company.name || "",
+      industry: company.industry || "",
+      website: company.website || "",
+      status: company.status || "Active",
+      notes: company.notes || "",
+      street: company.address?.street || "",
+      city: company.address?.city || "",
+      state: company.address?.state || "",
+    });
+    setIsEditOpen(true);
   };
 
   if (isCompanyLoading) {
@@ -152,7 +225,8 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+            {/* Bug #11 fix: "Edit Profile" now opens a real edit dialog */}
+            <Button variant="outline" className="gap-2" onClick={openEditDialog}>
               <Settings className="w-4 h-4" /> Edit Profile
             </Button>
             <Button variant="outline" className="gap-2 text-destructive hover:bg-destructive/5 border-destructive/20" onClick={handleDelete}>
@@ -182,7 +256,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <InfoItem icon={<Globe className="w-4 h-4" />} label="Website" value={company.website || "No website"} isLink={!!company.website} />
-                        <InfoItem icon={<MapPin className="w-4 h-4" />} label="Main Office" value={company.address ? `${company.address.street}, ${company.address.city}` : "No address"} />
+                        <InfoItem icon={<MapPin className="w-4 h-4" />} label="Main Office" value={company.address ? `${company.address.street || ""}, ${company.address.city || ""}`.replace(/^,\s*/, '') || "No address" : "No address"} />
                         <InfoItem icon={<Calendar className="w-4 h-4" />} label="Added To CRM" value={company.createdAt?.seconds ? format(new Date(company.createdAt.seconds * 1000), "PPP") : "Just now"} />
                       </div>
                       <div className="space-y-4">
@@ -235,7 +309,13 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                       <CardTitle className="text-lg">Key Stakeholders</CardTitle>
                       <CardDescription>Primary points of contact at {company.name}.</CardDescription>
                     </div>
-                    <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Contact</Button>
+                    {/* Bug #10 fix: "Add Contact" now opens CreateContactDialog pre-filled with companyId */}
+                    <CreateContactDialog 
+                      initialCompanyId={companyId}
+                      trigger={
+                        <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Contact</Button>
+                      }
+                    />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
@@ -254,7 +334,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                             <div className="flex gap-2">
                               <Button variant="ghost" size="icon" className="h-8 w-8" asChild><a href={`mailto:${contact.email}`}><Mail className="w-4 h-4" /></a></Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8"><MessageSquare className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild><Link href={`/crm/contacts/${contact.id}`}><ExternalLink className="w-4 h-4" /></Link></Button>
                             </div>
                           </div>
                         ))
@@ -282,7 +362,10 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                           <div key={deal.id} className="p-4 rounded-lg border border-border group hover:border-primary/30 transition-all">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-bold text-sm group-hover:text-primary transition-colors">{deal.title}</h4>
-                              <Badge variant="outline" className="text-[9px] uppercase tracking-widest">{deal.stage}</Badge>
+                              {/* Bug #1 fix: use stageNameMap to look up the human-readable stage name */}
+                              <Badge variant="outline" className="text-[9px] uppercase tracking-widest">
+                                {stageNameMap[deal.stageId] || deal.stageId || "Unknown"}
+                              </Badge>
                             </div>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                               <span className="font-bold text-foreground">${(deal.value || 0).toLocaleString()}</span>
@@ -391,19 +474,93 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
+            {/* Bug #12 fix: Direct Note now reads from company.notes field instead of hardcoded string */}
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Direct Note</CardTitle>
+                <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Account Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground italic leading-relaxed">
-                  "Important client for Q3 growth. High potential for retention if the Website Redesign milestone is met by end of month."
-                </p>
+                {company.notes ? (
+                  <p className="text-xs text-muted-foreground italic leading-relaxed">
+                    "{company.notes}"
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic opacity-50">
+                    No account notes. Edit profile to add notes.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
+
+      {/* Bug #11 fix: Edit Company Profile Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[520px] glass-card">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" /> Edit Company Profile
+            </DialogTitle>
+            <DialogDescription>Update the company's information and click Save.</DialogDescription>
+          </DialogHeader>
+          {editForm && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Company Name</Label>
+                <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Industry</Label>
+                  <Input value={editForm.industry} onChange={e => setEditForm({...editForm, industry: e.target.value})} placeholder="e.g., SaaS" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</Label>
+                  <Select value={editForm.status} onValueChange={v => setEditForm({...editForm, status: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Lead">Lead</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                      <SelectItem value="Churned">Churned</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Website</Label>
+                <Input value={editForm.website} onChange={e => setEditForm({...editForm, website: e.target.value})} placeholder="https://..." />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Street Address</Label>
+                <Input value={editForm.street} onChange={e => setEditForm({...editForm, street: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">City</Label>
+                  <Input value={editForm.city} onChange={e => setEditForm({...editForm, city: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">State</Label>
+                  <Input value={editForm.state} onChange={e => setEditForm({...editForm, state: e.target.value})} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Account Notes</Label>
+                <Textarea value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} placeholder="Key account context..." className="min-h-[80px]" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)} className="gap-2"><X className="w-4 h-4" /> Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={saving} className="gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

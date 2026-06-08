@@ -16,8 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, Plus, Loader2 } from "lucide-react";
 import { useFirebase, useUser } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, serverTimestamp, addDoc } from "firebase/firestore";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
 export function CreateCompanyDialog() {
@@ -29,7 +29,9 @@ export function CreateCompanyDialog() {
     name: "",
     industry: "",
     website: "",
-    address: "",
+    street: "",
+    city: "",
+    state: "",
     status: "Lead"
   });
 
@@ -39,19 +41,30 @@ export function CreateCompanyDialog() {
     setLoading(true);
 
     try {
-      await addDocumentNonBlocking(collection(firestore, "companies"), {
-        ...formData,
+      // Bug #14 fix: use addDoc directly (blocking) so errors are properly caught
+      await addDoc(collection(firestore, "companies"), {
+        name: formData.name,
+        industry: formData.industry,
+        website: formData.website,
+        // Bug #2 fix: save as structured object to match how all pages read it
+        address: {
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+        },
+        status: formData.status,
         workspaceId: profile.currentWorkspaceId,
         healthScore: 100,
+        lifetimeValue: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       toast({ title: "Company Created", description: `${formData.name} added to directory.` });
       setIsOpen(false);
-      setFormData({ name: "", industry: "", website: "", address: "", status: "Lead" });
+      setFormData({ name: "", industry: "", website: "", street: "", city: "", state: "", status: "Lead" });
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Error creating company", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -84,13 +97,36 @@ export function CreateCompanyDialog() {
               <Input value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} placeholder="e.g., Fintech" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Website</Label>
-              <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} placeholder="https://..." />
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</Label>
+              <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Lead">Lead</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Churned">Churned</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Main Office Address</Label>
-            <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="123 Business St, NY" />
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Website</Label>
+            <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} placeholder="https://..." />
+          </div>
+          {/* Bug #2 fix: structured address fields instead of a flat string */}
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Street Address</Label>
+            <Input value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} placeholder="123 Business St" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">City</Label>
+              <Input value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} placeholder="New York" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">State</Label>
+              <Input value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} placeholder="NY" />
+            </div>
           </div>
           <DialogFooter className="pt-4">
             <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>

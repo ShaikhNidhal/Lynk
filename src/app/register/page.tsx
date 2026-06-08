@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useFirebase } from "@/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, serverTimestamp, collection } from "firebase/firestore";
+import { doc, serverTimestamp, collection, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 
 const LogoIcon = ({ className }: { className?: string }) => (
@@ -64,7 +63,7 @@ export default function RegisterPage() {
       const workspaceRef = doc(collection(firestore, "workspaces"));
       const workspaceId = workspaceRef.id;
       
-      setDocumentNonBlocking(workspaceRef, {
+      await setDoc(workspaceRef, {
         id: workspaceId,
         name: formData.workspaceName || `${formData.firstName}'s Workspace`,
         slug: (formData.workspaceName || formData.firstName).toLowerCase().replace(/\s+/g, '-'),
@@ -76,7 +75,7 @@ export default function RegisterPage() {
 
       // 4. Create User Profile with currentWorkspaceId
       const userRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userRef, {
+      await setDoc(userRef, {
         id: user.uid,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -87,18 +86,75 @@ export default function RegisterPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
+      // Seed default roles out-of-the-box
+      const adminRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_workspace_administrator");
+      await setDoc(adminRoleRef, {
+        id: "role_workspace_administrator",
+        name: "Workspace Administrator",
+        permissions: [
+          "crm:read", "crm:create", "crm:update", "crm:delete",
+          "projects:read", "projects:create", "projects:update", "projects:delete",
+          "tasks:create", "tasks:update", "tasks:delete",
+          "settings:read", "settings:write"
+        ],
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      const salesManagerRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_sales_manager");
+      await setDoc(salesManagerRoleRef, {
+        id: "role_sales_manager",
+        name: "Sales Manager",
+        permissions: [
+          "crm:read", "crm:create", "crm:update", "crm:delete",
+          "projects:read", "projects:create", "projects:update",
+          "tasks:create", "tasks:update"
+        ],
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      const standardRepRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_standard_rep");
+      await setDoc(standardRepRoleRef, {
+        id: "role_standard_rep",
+        name: "Standard Executive Account Representative",
+        permissions: [
+          "crm:read", "crm:create", "crm:update",
+          "projects:read",
+          "tasks:create", "tasks:update"
+        ],
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
       // 5. Create Workspace Membership
       const memberRef = doc(firestore, "workspaces", workspaceId, "members", user.uid);
-      setDocumentNonBlocking(memberRef, {
+      await setDoc(memberRef, {
         id: user.uid,
         workspaceId: workspaceId,
         userId: user.uid,
         role: "owner",
+        roles: ["role_workspace_administrator"],
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         joinedAt: serverTimestamp(),
       }, { merge: true });
+
+      // 6. Set custom claims on user Auth via session API
+      const idToken = await user.getIdToken();
+      const sessionResponse = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!sessionResponse.ok) {
+        const data = await sessionResponse.json();
+        throw new Error(data.error || "Failed to set up secure session custom claims.");
+      }
+
+      // 7. Force token refresh to apply custom claims locally
+      await user.getIdToken(true);
 
       toast({
         title: "Registration Successful",
