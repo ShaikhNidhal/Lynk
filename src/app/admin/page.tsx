@@ -169,7 +169,6 @@ export default function AdminPage() {
   // Lifecycle Management States
   const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
-  const [newWorkspacePlan, setNewWorkspacePlan] = useState("free");
   const [newWorkspaceOwner, setNewWorkspaceOwner] = useState("");
 
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -236,7 +235,7 @@ export default function AdminPage() {
 
   const handleCreateWorkspace = async () => {
     if (!firestore || !newWorkspaceName) return;
-    const wsId = `ws_${Math.random().toString(36).substring(2, 11)}`;
+    const wsId = `ws-${Math.random().toString(36).substring(2, 11)}`;
     const slug = newWorkspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const wsRef = doc(firestore, "workspaces", wsId);
     try {
@@ -244,7 +243,7 @@ export default function AdminPage() {
         id: wsId,
         name: newWorkspaceName,
         slug,
-        planType: newWorkspacePlan,
+        planType: "pro",
         ownerId: newWorkspaceOwner || "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -2044,7 +2043,6 @@ export default function AdminPage() {
                           className="gap-1.5 text-xs font-bold uppercase tracking-wider h-9 shrink-0"
                           onClick={() => {
                             setNewWorkspaceName("");
-                            setNewWorkspacePlan("free");
                             setNewWorkspaceOwner("");
                             setIsAddWorkspaceOpen(true);
                           }}
@@ -2070,7 +2068,6 @@ export default function AdminPage() {
                             <TableRow>
                               <TableHead>Workspace Name</TableHead>
                               <TableHead>Workspace ID</TableHead>
-                              <TableHead>Plan Type</TableHead>
                               <TableHead>Owner UID</TableHead>
                               <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -2090,11 +2087,6 @@ export default function AdminPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-xs font-mono">{ws.id}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="text-[10px] uppercase font-bold text-accent bg-accent/5">
-                                      {ws.planType || "free"}
-                                    </Badge>
-                                  </TableCell>
                                   <TableCell className="text-xs text-muted-foreground font-mono">{ws.ownerId || "N/A"}</TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-2 items-center">
@@ -2886,19 +2878,6 @@ export default function AdminPage() {
                     value={newWorkspaceName}
                     onChange={(e) => setNewWorkspaceName(e.target.value)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-ws-plan">Billing Plan</Label>
-                  <Select value={newWorkspacePlan} onValueChange={setNewWorkspacePlan}>
-                    <SelectTrigger id="create-ws-plan" className="bg-white">
-                      <SelectValue placeholder="Select Plan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="free">Free Trial</SelectItem>
-                      <SelectItem value="pro">Pro Plan</SelectItem>
-                      <SelectItem value="enterprise">Enterprise Plan</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="create-ws-owner">Owner User (Optional)</Label>
