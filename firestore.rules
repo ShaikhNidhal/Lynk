@@ -49,7 +49,7 @@ service cloud.firestore {
     match /workspaces/{workspaceId} {
       allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
       allow create: if isAuthenticated();
-      allow update: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
+      allow update, delete: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
 
       match /members/{memberId} {
         allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
