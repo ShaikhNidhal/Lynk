@@ -166,6 +166,11 @@ export default function AdminPage() {
     }
   };
 
+  // Corporate Hierarchy States
+  const [isCreatingSub, setIsCreatingSub] = useState(false);
+  const [isCreatingDept, setIsCreatingDept] = useState(false);
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+
   // Lifecycle Management States
   const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
@@ -536,6 +541,7 @@ export default function AdminPage() {
   // Corporate Hierarchy Handlers
   const handleAddSubsidiary = async () => {
     if (!firestore || !profile?.currentWorkspaceId || !newSubsidiaryName) return;
+    setIsCreatingSub(true);
     const subId = `sub_${Math.random().toString(36).substring(2, 11)}`;
     const subRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "subsidiaries", subId);
     try {
@@ -557,6 +563,8 @@ export default function AdminPage() {
         description: e.message,
         variant: "destructive"
       });
+    } finally {
+      setIsCreatingSub(false);
     }
   };
 
@@ -602,6 +610,7 @@ export default function AdminPage() {
 
   const handleAddDepartment = async () => {
     if (!firestore || !profile?.currentWorkspaceId || !newDepartmentName || !newDepartmentSubId) return;
+    setIsCreatingDept(true);
     const deptId = `dept_${Math.random().toString(36).substring(2, 11)}`;
     const deptRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "departments", deptId);
     try {
@@ -625,6 +634,8 @@ export default function AdminPage() {
         description: e.message,
         variant: "destructive"
       });
+    } finally {
+      setIsCreatingDept(false);
     }
   };
 
@@ -671,6 +682,7 @@ export default function AdminPage() {
 
   const handleAddTeam = async () => {
     if (!firestore || !profile?.currentWorkspaceId || !newTeamName || !newTeamSubId || !newTeamDeptId) return;
+    setIsCreatingTeam(true);
     const teamId = `team_${Math.random().toString(36).substring(2, 11)}`;
     const teamRef = doc(firestore, "workspaces", profile.currentWorkspaceId, "teams", teamId);
     try {
@@ -696,6 +708,8 @@ export default function AdminPage() {
         description: e.message,
         variant: "destructive"
       });
+    } finally {
+      setIsCreatingTeam(false);
     }
   };
 
@@ -1689,7 +1703,6 @@ export default function AdminPage() {
                         <TableHeader className="bg-secondary/5">
                           <TableRow>
                             <TableHead>Company Name</TableHead>
-                            <TableHead>ID</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1700,7 +1713,6 @@ export default function AdminPage() {
                                 <Building2 className="w-4 h-4 text-primary" />
                                 {sub.name}
                               </TableCell>
-                              <TableCell className="text-xs font-mono text-muted-foreground">{sub.id}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button 
@@ -1770,7 +1782,6 @@ export default function AdminPage() {
                           <TableRow>
                             <TableHead>Department Name</TableHead>
                             <TableHead>Subsidiary Company</TableHead>
-                            <TableHead>ID</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1785,7 +1796,6 @@ export default function AdminPage() {
                                     {parentSub?.name || "Unknown Subsidiary"}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-xs font-mono text-muted-foreground">{dept.id}</TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-2">
                                     <Button 
@@ -2592,10 +2602,11 @@ export default function AdminPage() {
                   Cancel
                 </Button>
                 <Button 
-                  disabled={!newSubsidiaryName}
+                  disabled={!newSubsidiaryName || isCreatingSub}
                   onClick={handleAddSubsidiary}
                   className="text-xs font-bold uppercase tracking-wider"
                 >
+                  {isCreatingSub ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5 text-white" /> : null}
                   Create Company
                 </Button>
               </DialogFooter>
@@ -2670,10 +2681,11 @@ export default function AdminPage() {
                   Cancel
                 </Button>
                 <Button 
-                  disabled={!newDepartmentName || !newDepartmentSubId}
+                  disabled={!newDepartmentName || !newDepartmentSubId || isCreatingDept}
                   onClick={handleAddDepartment}
                   className="text-xs font-bold uppercase tracking-wider"
                 >
+                  {isCreatingDept ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5 text-white" /> : null}
                   Create Department
                 </Button>
               </DialogFooter>
@@ -2784,10 +2796,11 @@ export default function AdminPage() {
                   Cancel
                 </Button>
                 <Button 
-                  disabled={!newTeamName || !newTeamSubId || !newTeamDeptId}
+                  disabled={!newTeamName || !newTeamSubId || !newTeamDeptId || isCreatingTeam}
                   onClick={handleAddTeam}
                   className="text-xs font-bold uppercase tracking-wider"
                 >
+                  {isCreatingTeam ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5 text-white" /> : null}
                   Create Team
                 </Button>
               </DialogFooter>
