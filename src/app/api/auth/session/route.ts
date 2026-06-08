@@ -18,11 +18,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { idToken } = body;
+    const { idToken, firstName: regFirstName, lastName: regLastName, workspaceName: regWorkspaceName } = body;
 
     if (!idToken) {
       return NextResponse.json(
@@ -48,55 +49,152 @@ export async function POST(req: NextRequest) {
     const uid = decodedToken.uid;
     const email = decodedToken.email || '';
 
-    // ─── Step 2: Fetch the user profile to get workspaceId (tenantId) ─────────
-    const userDoc = await adminDb.collection('users').doc(uid).get();
+    // ─── Step 2: Fetch or Self-Heal User Profile and Workspace ────────────────
+    let userDoc = await adminDb.collection('users').doc(uid).get();
+    let workspaceId = '';
+    let memberRole = 'member';
+    let assignedRoleIds: string[] = [];
+
     if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'User profile not found. Please complete registration.' },
-        { status: 404 }
-      );
+      console.log(`[API Auth Session] Profile for ${uid} does not exist. Initializing server-side self-healing...`);
+      
+      const emailPrefix = email.split('@')[0] || 'User';
+      const firstName = regFirstName || emailPrefix;
+      const lastName = regLastName || '';
+      const workspaceName = regWorkspaceName || `${firstName}'s Workspace`;
+      const fallbackWorkspaceId = `ws-${uid}`;
+
+      const adminDbBatch = adminDb.batch();
+
+      // 1. Create Workspace
+      const workspaceRef = adminDb.collection('workspaces').doc(fallbackWorkspaceId);
+      adminDbBatch.set(workspaceRef, {
+        id: fallbackWorkspaceId,
+        name: workspaceName,
+        slug: workspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        planType: 'pro',
+        ownerId: uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Seed default roles out-of-the-box
+      const defaultRoles = [
+        {
+          id: 'role_workspace_administrator',
+          name: 'Workspace Administrator',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update', 'crm:delete',
+            'projects:read', 'projects:create', 'projects:update', 'projects:delete',
+            'tasks:create', 'tasks:update', 'tasks:delete',
+            'settings:read', 'settings:write'
+          ]
+        },
+        {
+          id: 'role_sales_manager',
+          name: 'Sales Manager',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update', 'crm:delete',
+            'projects:read', 'projects:create', 'projects:update',
+            'tasks:create', 'tasks:update'
+          ]
+        },
+        {
+          id: 'role_standard_rep',
+          name: 'Standard Executive Account Representative',
+          permissions: [
+            'crm:read', 'crm:create', 'crm:update',
+            'projects:read',
+            'tasks:create', 'tasks:update'
+          ]
+        }
+      ];
+
+      defaultRoles.forEach(role => {
+        const roleRef = workspaceRef.collection('roles').doc(role.id);
+        adminDbBatch.set(roleRef, {
+          id: role.id,
+          name: role.name,
+          permissions: role.permissions,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      // 2. Create Workspace Membership
+      const isAdminEmail = email === 'nidhal.shaikh@gmail.com';
+      memberRole = isAdminEmail ? 'Admin' : 'owner';
+      assignedRoleIds = ['role_workspace_administrator'];
+
+      const memberRef = workspaceRef.collection('members').doc(uid);
+      adminDbBatch.set(memberRef, {
+        id: uid,
+        workspaceId: fallbackWorkspaceId,
+        userId: uid,
+        role: memberRole,
+        roles: assignedRoleIds,
+        email,
+        firstName,
+        lastName,
+        joinedAt: FieldValue.serverTimestamp(),
+      });
+
+      // 3. Create User Profile document
+      const userRef = adminDb.collection('users').doc(uid);
+      adminDbBatch.set(userRef, {
+        id: uid,
+        firstName,
+        lastName,
+        email,
+        role: isAdminEmail ? 'Admin' : 'Team Member',
+        currentWorkspaceId: fallbackWorkspaceId,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Commit all writes atomically
+      await adminDbBatch.commit();
+      workspaceId = fallbackWorkspaceId;
+
+      console.log(`[API Auth Session] Server-side self-healing successful for UID: ${uid}`);
+    } else {
+      const userProfile = userDoc.data()!;
+      workspaceId = userProfile.currentWorkspaceId;
+
+      if (!workspaceId) {
+        return NextResponse.json(
+          { error: 'No workspace assigned. Contact your workspace administrator.' },
+          { status: 403 }
+        );
+      }
+
+      // ─── Step 3: Fetch the user's role in the workspace ─────────────────────
+      const memberDoc = await adminDb
+        .collection('workspaces')
+        .doc(workspaceId)
+        .collection('members')
+        .doc(uid)
+        .get();
+
+      if (!memberDoc.exists) {
+        return NextResponse.json(
+          { error: 'Not a member of any workspace. Contact your administrator.' },
+          { status: 403 }
+        );
+      }
+
+      const memberData = memberDoc.data()!;
+      memberRole = memberData.role || 'member';
+      assignedRoleIds = memberData.roles || [];
     }
-
-    const userProfile = userDoc.data()!;
-    const workspaceId: string = userProfile.currentWorkspaceId;
-
-    if (!workspaceId) {
-      return NextResponse.json(
-        { error: 'No workspace assigned. Contact your workspace administrator.' },
-        { status: 403 }
-      );
-    }
-
-    // ─── Step 3: Fetch the user's role in the workspace ───────────────────────
-    const memberDoc = await adminDb
-      .collection('workspaces')
-      .doc(workspaceId)
-      .collection('members')
-      .doc(uid)
-      .get();
-
-    if (!memberDoc.exists) {
-      return NextResponse.json(
-        { error: 'Not a member of any workspace. Contact your administrator.' },
-        { status: 403 }
-      );
-    }
-
-    const memberData = memberDoc.data()!;
-    const memberRole: string = memberData.role || 'member';
-    const assignedRoleIds: string[] = memberData.roles || [];
 
     // ─── Step 4: Fetch granular permissions from all assigned roles ───────────
-    // This is exactly equivalent to the SQL JOIN on role_permissions
     const permissionsSet = new Set<string>();
 
-    // Super admin / owner bypass — gets all permissions
+    // Super admin / owner bypass
     const isOwnerOrAdmin = ['owner', 'admin', 'Admin'].includes(memberRole);
     if (isOwnerOrAdmin) {
-      // Owners and admins implicitly have every permission
       permissionsSet.add('*');
     } else {
-      // Fetch each assigned role document and collect permissions
       const rolePromises = assignedRoleIds.map((roleId) =>
         adminDb
           .collection('workspaces')
@@ -119,12 +217,10 @@ export async function POST(req: NextRequest) {
     const permissions = Array.from(permissionsSet);
 
     // ─── Step 5: Set Firebase Custom Claims (embed tenantId + perms in token) ─
-    // Like packing tenantId and permissions into a JWT — but Firebase handles
-    // token signing and rotation automatically.
     await adminAuth.setCustomUserClaims(uid, {
       workspaceId,          // Tenant boundary — the hard isolation key
       role: memberRole,     // e.g. 'owner', 'admin', 'Sales Manager'
-      permissions,          // Granular RBAC flags: ['crm:read', 'crm:create', ...]
+      permissions,          // Granular RBAC flags
     });
 
     // ─── Step 6: Return the session context and set secure __session cookie ───
@@ -137,8 +233,6 @@ export async function POST(req: NextRequest) {
         role: memberRole,
         permissions,
       },
-      // Instruct client to force-refresh their ID token so the new custom
-      // claims take effect immediately
       requiresTokenRefresh: true,
     });
 

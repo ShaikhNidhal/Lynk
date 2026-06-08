@@ -59,101 +59,27 @@ export default function RegisterPage() {
         description: "Please check your inbox to verify your email address.",
       });
 
-      // 3. Create Workspace
-      const workspaceRef = doc(collection(firestore, "workspaces"));
-      const workspaceId = workspaceRef.id;
-      
-      await setDoc(workspaceRef, {
-        id: workspaceId,
-        name: formData.workspaceName || `${formData.firstName}'s Workspace`,
-        slug: (formData.workspaceName || formData.firstName).toLowerCase().replace(/\s+/g, '-'),
-        planType: "free",
-        ownerId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // 4. Create User Profile with currentWorkspaceId
-      const userRef = doc(firestore, "users", user.uid);
-      await setDoc(userRef, {
-        id: user.uid,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        role: formData.role,
-        currentWorkspaceId: workspaceId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // Seed default roles out-of-the-box
-      const adminRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_workspace_administrator");
-      await setDoc(adminRoleRef, {
-        id: "role_workspace_administrator",
-        name: "Workspace Administrator",
-        permissions: [
-          "crm:read", "crm:create", "crm:update", "crm:delete",
-          "projects:read", "projects:create", "projects:update", "projects:delete",
-          "tasks:create", "tasks:update", "tasks:delete",
-          "settings:read", "settings:write"
-        ],
-        createdAt: serverTimestamp()
-      }, { merge: true });
-
-      const salesManagerRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_sales_manager");
-      await setDoc(salesManagerRoleRef, {
-        id: "role_sales_manager",
-        name: "Sales Manager",
-        permissions: [
-          "crm:read", "crm:create", "crm:update", "crm:delete",
-          "projects:read", "projects:create", "projects:update",
-          "tasks:create", "tasks:update"
-        ],
-        createdAt: serverTimestamp()
-      }, { merge: true });
-
-      const standardRepRoleRef = doc(firestore, "workspaces", workspaceId, "roles", "role_standard_rep");
-      await setDoc(standardRepRoleRef, {
-        id: "role_standard_rep",
-        name: "Standard Executive Account Representative",
-        permissions: [
-          "crm:read", "crm:create", "crm:update",
-          "projects:read",
-          "tasks:create", "tasks:update"
-        ],
-        createdAt: serverTimestamp()
-      }, { merge: true });
-
-      // 5. Create Workspace Membership
-      const memberRef = doc(firestore, "workspaces", workspaceId, "members", user.uid);
-      await setDoc(memberRef, {
-        id: user.uid,
-        workspaceId: workspaceId,
-        userId: user.uid,
-        role: "owner",
-        roles: ["role_workspace_administrator"],
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        joinedAt: serverTimestamp(),
-      }, { merge: true });
-
-      // 6. Set custom claims on user Auth via session API
+      // 3. Call the server-side API to atomically initialize the workspace and user profile
       const idToken = await user.getIdToken();
       const sessionResponse = await fetch("/api/auth/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ 
+          idToken,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          workspaceName: formData.workspaceName
+        }),
       });
 
       if (!sessionResponse.ok) {
         const data = await sessionResponse.json();
-        throw new Error(data.error || "Failed to set up secure session custom claims.");
+        throw new Error(data.error || "Failed to initialize secure session and database profile.");
       }
 
-      // 7. Force token refresh to apply custom claims locally
+      // 4. Force token refresh to apply server-seeded custom claims locally
       await user.getIdToken(true);
 
       toast({
