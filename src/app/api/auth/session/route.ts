@@ -176,15 +176,20 @@ export async function POST(req: NextRequest) {
         .get();
 
       if (!memberDoc.exists) {
-        return NextResponse.json(
-          { error: 'Not a member of any workspace. Contact your administrator.' },
-          { status: 403 }
-        );
+        if (userProfile.role === 'Admin') {
+          memberRole = 'Admin';
+          assignedRoleIds = ['role_workspace_administrator'];
+        } else {
+          return NextResponse.json(
+            { error: 'Not a member of any workspace. Contact your administrator.' },
+            { status: 403 }
+          );
+        }
+      } else {
+        const memberData = memberDoc.data()!;
+        memberRole = memberData.role || 'member';
+        assignedRoleIds = memberData.roles || [];
       }
-
-      const memberData = memberDoc.data()!;
-      memberRole = memberData.role || 'member';
-      assignedRoleIds = memberData.roles || [];
     }
 
     // ─── Step 4: Fetch granular permissions from all assigned roles ───────────

@@ -64,6 +64,108 @@ export default function AdminPage() {
   // 1. RBAC Guard - Verify Admin status
   const isAdmin = profile?.role === "Admin";
 
+  // Global SaaS States
+  const [workspaceSearch, setWorkspaceSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
+  const [updatingGlobalRole, setUpdatingGlobalRole] = useState<string | null>(null);
+
+  // Global SaaS Queries
+  const workspacesQuery = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, "workspaces"), limit(100));
+  }, [firestore, isAdmin]);
+  const { data: globalWorkspaces, isLoading: isWorkspacesLoading } = useCollection(workspacesQuery);
+
+  const globalUsersQuery = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, "users"), limit(100));
+  }, [firestore, isAdmin]);
+  const { data: globalUsers, isLoading: isGlobalUsersLoading } = useCollection(globalUsersQuery);
+
+  // Filtered SaaS Lists
+  const filteredWorkspaces = useMemo(() => {
+    if (!globalWorkspaces) return [];
+    return globalWorkspaces.filter(ws => 
+      ws.name?.toLowerCase().includes(workspaceSearch.toLowerCase()) ||
+      ws.id?.toLowerCase().includes(workspaceSearch.toLowerCase()) ||
+      ws.slug?.toLowerCase().includes(workspaceSearch.toLowerCase())
+    );
+  }, [globalWorkspaces, workspaceSearch]);
+
+  const filteredUsers = useMemo(() => {
+    if (!globalUsers) return [];
+    return globalUsers.filter(u => 
+      `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.id?.toLowerCase().includes(userSearch.toLowerCase())
+    );
+  }, [globalUsers, userSearch]);
+
+  // Context-switching & Global Role Handlers
+  const handleSwitchWorkspace = async (targetWorkspaceId: string) => {
+    if (!firestore || !user?.uid) return;
+    setSwitchingWorkspaceId(targetWorkspaceId);
+    try {
+      // 1. Update currentWorkspaceId in users/{uid}
+      const userRef = doc(firestore, "users", user.uid);
+      await setDoc(userRef, { currentWorkspaceId: targetWorkspaceId }, { merge: true });
+
+      // 2. Recalculate server session claims
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to recalculate session context.");
+      }
+
+      // 3. Force-refresh token on client-side
+      await user.getIdToken(true);
+
+      toast({
+        title: "Workspace Context Switched",
+        description: `Successfully switched workspace to ${targetWorkspaceId}. Reloading page...`,
+      });
+
+      // 4. Reload page
+      window.location.reload();
+    } catch (e: any) {
+      toast({
+        title: "Failed to Switch Workspace",
+        description: e.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSwitchingWorkspaceId(null);
+    }
+  };
+
+  const handleGlobalRoleChange = async (userId: string, newRole: string) => {
+    if (!firestore) return;
+    setUpdatingGlobalRole(userId);
+    try {
+      const userRef = doc(firestore, "users", userId);
+      await setDoc(userRef, { role: newRole }, { merge: true });
+      toast({
+        title: "Global Role Updated",
+        description: `User global role has been updated to ${newRole}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to Update Global Role",
+        description: e.message,
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingGlobalRole(null);
+    }
+  };
+
+
   // 2. Fetch all members in the current workspace
   const membersQuery = useMemoFirebase(() => {
     if (!firestore || !profile?.currentWorkspaceId) return null;
@@ -754,13 +856,18 @@ export default function AdminPage() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Main Controls: Tabs for User Management & Roles/Permissions */}
           <Tabs defaultValue="users" className="lg:col-span-2 space-y-6">
-            <TabsList className="grid w-full grid-cols-2 bg-secondary/10 h-auto gap-2 p-2 rounded-xl">
+            <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'} bg-secondary/10 h-auto gap-2 p-2 rounded-xl`}>
               <TabsTrigger value="users" className="gap-2 text-xs py-2">
                 <Users className="w-4 h-4" /> Users Directory
               </TabsTrigger>
               <TabsTrigger value="roles" className="gap-2 text-xs py-2">
                 <Key className="w-4 h-4" /> Roles & Permissions
               </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="saas" className="gap-2 text-xs py-2">
+                  <Building2 className="w-4 h-4" /> Global SaaS Control
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Users Directory Tab */}
@@ -943,6 +1050,238 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Global SaaS Control Tab */}
+            {isAdmin && (
+              <TabsContent value="saas" className="mt-0 space-y-6">
+                {/* Workspaces Management Card */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Building2 className="w-5 h-5 text-primary" />
+                          Global Workspaces
+                        </CardTitle>
+                        <CardDescription>
+                          View all workspaces in the SaaS system and switch contexts to inspect their data.
+                        </CardDescription>
+                      </div>
+                      <div className="w-full md:w-72 relative">
+                        <Input
+                          placeholder="Search workspaces..."
+                          value={workspaceSearch}
+                          onChange={(e) => setWorkspaceSearch(e.target.value)}
+                          className="bg-white/50 text-xs pl-8"
+                        />
+                        <span className="absolute left-2.5 top-2.5 text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="w-4 h-4"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isWorkspacesLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : filteredWorkspaces.length === 0 ? (
+                      <div className="text-center py-12 border border-dashed rounded-xl opacity-50 italic text-sm">
+                        No workspaces found matching the query.
+                      </div>
+                    ) : (
+                      <div className="border rounded-xl overflow-hidden bg-white/50 backdrop-blur-sm">
+                        <Table>
+                          <TableHeader className="bg-secondary/5">
+                            <TableRow>
+                              <TableHead>Workspace Name</TableHead>
+                              <TableHead>Workspace ID</TableHead>
+                              <TableHead>Plan Type</TableHead>
+                              <TableHead>Owner UID</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredWorkspaces.map((ws) => {
+                              const isCurrent = profile?.currentWorkspaceId === ws.id;
+                              return (
+                                <TableRow key={ws.id} className={isCurrent ? "bg-primary/5 font-semibold" : ""}>
+                                  <TableCell className="font-bold flex items-center gap-3 py-4">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black">
+                                      {ws.name?.[0]?.toUpperCase() || "W"}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span>{ws.name}</span>
+                                      <span className="text-[10px] text-muted-foreground font-normal">slug: {ws.slug}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-xs font-mono">{ws.id}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px] uppercase font-bold text-accent bg-accent/5">
+                                      {ws.planType || "free"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground font-mono">{ws.ownerId || "N/A"}</TableCell>
+                                  <TableCell className="text-right">
+                                    {isCurrent ? (
+                                      <Badge variant="secondary" className="text-[10px] font-bold bg-green-500/10 text-green-600 border-green-500/20 px-3 py-1">
+                                        Current Context
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 text-xs font-bold bg-white text-primary hover:bg-primary/5 border-primary/20"
+                                        disabled={switchingWorkspaceId !== null}
+                                        onClick={() => handleSwitchWorkspace(ws.id)}
+                                      >
+                                        {switchingWorkspaceId === ws.id ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                        ) : null}
+                                        Inspect
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Global Users Management Card */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Users className="w-5 h-5 text-primary" />
+                          Global Users Directory
+                        </CardTitle>
+                        <CardDescription>
+                          Manage all registered users, their global access roles, and inspect their active workspaces.
+                        </CardDescription>
+                      </div>
+                      <div className="w-full md:w-72 relative">
+                        <Input
+                          placeholder="Search users..."
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                          className="bg-white/50 text-xs pl-8"
+                        />
+                        <span className="absolute left-2.5 top-2.5 text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="w-4 h-4"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                            />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isGlobalUsersLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="text-center py-12 border border-dashed rounded-xl opacity-50 italic text-sm">
+                        No users found matching the query.
+                      </div>
+                    ) : (
+                      <div className="border rounded-xl overflow-hidden bg-white/50 backdrop-blur-sm">
+                        <Table>
+                          <TableHeader className="bg-secondary/5">
+                            <TableRow>
+                              <TableHead>User</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Global Role</TableHead>
+                              <TableHead>Active Workspace</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredUsers.map((u) => (
+                              <TableRow key={u.id}>
+                                <TableCell className="font-bold flex items-center gap-3 py-4">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} />
+                                    <AvatarFallback>{u.firstName?.[0] || "U"}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col">
+                                    <span>{u.firstName} {u.lastName}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono font-normal">{u.id}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-muted-foreground">{u.email}</TableCell>
+                                <TableCell>
+                                  <Select
+                                    disabled={updatingGlobalRole === u.id || u.id === user?.uid}
+                                    value={u.role || "Team Member"}
+                                    onValueChange={(v) => handleGlobalRoleChange(u.id, v)}
+                                  >
+                                    <SelectTrigger className="w-[120px] h-8 text-xs bg-white">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Admin">Admin</SelectItem>
+                                      <SelectItem value="Team Member">Team Member</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground">
+                                  {u.currentWorkspaceId || "None"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {u.currentWorkspaceId && u.currentWorkspaceId !== profile?.currentWorkspaceId ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 text-xs font-bold bg-white text-accent hover:bg-accent/5 border-accent/20"
+                                      disabled={switchingWorkspaceId !== null}
+                                      onClick={() => handleSwitchWorkspace(u.currentWorkspaceId)}
+                                    >
+                                      Inspect Workspace
+                                    </Button>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">None / Active</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
 
           {/* Manage Roles Dialog */}

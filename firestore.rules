@@ -8,49 +8,60 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isSystemAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
     // Checks if the current user is a member of the given workspace
     function isWorkspaceMember(workspaceId) {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)) ||
+        isSystemAdmin()
+      );
     }
 
     // Checks if the user holds one of the given role values in the workspace
     function hasWorkspaceRole(workspaceId, roles) {
-      return isWorkspaceMember(workspaceId) &&
-        get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role in roles;
+      return isWorkspaceMember(workspaceId) && (
+        isSystemAdmin() ||
+        (exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role in roles)
+      );
     }
 
     // ─── Users ─────────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if request.auth.uid == userId;
+      allow write: if request.auth.uid == userId || isSystemAdmin();
 
       match /notifications/{id} {
-        allow read, write: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId || isSystemAdmin();
       }
 
       match /timeEntries/{id} {
-        allow read, write: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId || isSystemAdmin();
       }
     }
 
     // ─── Workspaces ────────────────────────────────────────────────────────────
     match /workspaces/{workspaceId} {
-      allow read: if isWorkspaceMember(workspaceId);
+      allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
       allow create: if isAuthenticated();
-      allow update: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']);
+      allow update: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
 
       match /members/{memberId} {
-        allow read: if isWorkspaceMember(workspaceId);
-        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) ||
+        allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin() ||
           (request.auth.uid == memberId &&
            get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid);
       }
 
       // Roles subcollection
       match /roles/{roleId} {
-        allow read: if isWorkspaceMember(workspaceId);
-        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']);
+        allow read: if isWorkspaceMember(workspaceId) || isSystemAdmin();
+        allow write: if hasWorkspaceRole(workspaceId, ['owner', 'admin', 'Admin', 'manager']) || isSystemAdmin();
       }
     }
 
